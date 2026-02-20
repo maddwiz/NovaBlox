@@ -13,6 +13,16 @@
 - [ ] Save/publish commands tested on Windows + macOS Studio
 - [ ] Blender import queue route tested with OBJ and FBX upload
 
+## Cross-platform QA
+
+- [ ] Windows: `scripts/start-server-windows.bat` works from fresh clone
+- [ ] macOS: `scripts/start-server-macos.command` works from fresh clone
+- [ ] Linux: `scripts/start-server-linux.sh` + `examples/mock/e2e_mock.sh` pass
+- [ ] GitHub Actions `Node Check` passes on ubuntu/macOS/windows matrix
+- [ ] `docs/SETUP_WINDOWS.md` validated
+- [ ] `docs/SETUP_MACOS.md` validated
+- [ ] `docs/SETUP_LINUX.md` validated
+
 ## Security
 
 - [ ] API key enabled and validated

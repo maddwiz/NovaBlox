@@ -36,6 +36,12 @@ It exposes HTTP endpoints that queue Studio commands, then a Roblox Studio plugi
      -d '{"class_name":"Part","name":"BridgeTest","position":[0,8,0],"color":"Bright red","anchored":true}' | jq .
    ```
 
+## OS launchers
+
+- Windows: `scripts/start-server-windows.bat`
+- macOS: `scripts/start-server-macos.command`
+- Linux: `scripts/start-server-linux.sh`
+
 ## Env vars
 
 See `.env.example`.
@@ -52,6 +58,9 @@ See `.env.example`.
 ## Docs
 
 - `docs/API.md`
+- `docs/SETUP_WINDOWS.md`
+- `docs/SETUP_MACOS.md`
+- `docs/SETUP_LINUX.md`
 - `BuyerGuide.md`
 - `docs/RELEASE_CHECKLIST.md`
 

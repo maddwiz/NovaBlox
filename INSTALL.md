@@ -8,6 +8,12 @@ npm install
 npm start
 ```
 
+Shortcuts:
+
+- Windows: `scripts/start-server-windows.bat`
+- macOS: `scripts/start-server-macos.command`
+- Linux: `scripts/start-server-linux.sh`
+
 ## 2. Roblox Studio plugin
 
 1. Open Roblox Studio.
