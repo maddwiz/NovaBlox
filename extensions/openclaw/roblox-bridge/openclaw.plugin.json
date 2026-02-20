@@ -1,0 +1,11 @@
+{
+  "id": "novablox-roblox-bridge",
+  "name": "NovaBlox Roblox Bridge",
+  "version": "1.0.0",
+  "description": "Control Roblox Studio through NovaBlox bridge endpoints",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

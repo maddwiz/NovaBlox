@@ -1,0 +1,237 @@
+"""NovaBlox Python SDK.
+
+Zero-dependency client for the NovaBlox Roblox Studio bridge.
+"""
+
+from __future__ import annotations
+
+import json
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
+
+
+class NovaBloxError(RuntimeError):
+    """Raised on bridge communication failures."""
+
+
+@dataclass
+class NovaBlox:
+    host: str = "localhost"
+    port: int = 30010
+    timeout: int = 60
+    api_key: Optional[str] = None
+
+    @property
+    def base_url(self) -> str:
+        return f"http://{self.host}:{self.port}/bridge"
+
+    def _request(self, method: str, route: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        body = None
+        headers = {}
+        if data is not None:
+            body = json.dumps(data).encode("utf-8")
+            headers["Content-Type"] = "application/json"
+            headers["Content-Length"] = str(len(body))
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+
+        req = urllib.request.Request(
+            f"{self.base_url}{route}",
+            method=method,
+            data=body,
+            headers=headers,
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as resp:
+                payload = resp.read()
+                if not payload:
+                    return {"status": "ok"}
+                return json.loads(payload)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise NovaBloxError(f"HTTP {exc.code}: {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise NovaBloxError(f"Connection failed: {exc.reason}") from exc
+        except json.JSONDecodeError as exc:
+            raise NovaBloxError(f"Invalid JSON response: {exc}") from exc
+
+    def _get(self, route: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        final_route = route
+        if params:
+            final_route = f"{route}?{urllib.parse.urlencode(params)}"
+        return self._request("GET", final_route)
+
+    def _post(self, route: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        return self._request("POST", route, data or {})
+
+    def health(self) -> Dict[str, Any]:
+        return self._get("/health")
+
+    def stats(self) -> Dict[str, Any]:
+        return self._get("/stats")
+
+    def command_status(self, command_id: str) -> Dict[str, Any]:
+        return self._get(f"/commands/{urllib.parse.quote(command_id)}")
+
+    def queue_command(
+        self,
+        *,
+        route: str,
+        action: str,
+        payload: Optional[Dict[str, Any]] = None,
+        category: str = "custom",
+        priority: int = 0,
+    ) -> Dict[str, Any]:
+        return self._post(
+            "/command",
+            {
+                "route": route,
+                "action": action,
+                "category": category,
+                "priority": priority,
+                "payload": payload or {},
+            },
+        )
+
+    def spawn_part(
+        self,
+        *,
+        name: str = "Part",
+        position: Optional[list[float]] = None,
+        size: Optional[list[float]] = None,
+        color: str = "Bright red",
+        anchored: bool = True,
+    ) -> Dict[str, Any]:
+        return self._post(
+            "/scene/spawn-object",
+            {
+                "class_name": "Part",
+                "name": name,
+                "position": position or [0, 5, 0],
+                "size": size or [4, 1, 2],
+                "color": color,
+                "anchored": anchored,
+            },
+        )
+
+    def set_property(
+        self,
+        *,
+        property_name: str,
+        value: Any,
+        target_name: Optional[str] = None,
+        target_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"property": property_name, "value": value}
+        if target_name:
+            payload["target_name"] = target_name
+        if target_path:
+            payload["target_path"] = target_path
+        return self._post("/scene/set-property", payload)
+
+    def set_transform(
+        self,
+        *,
+        target_name: Optional[str] = None,
+        target_path: Optional[str] = None,
+        position: Optional[list[float]] = None,
+        rotation: Optional[list[float]] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if target_name:
+            payload["target_name"] = target_name
+        if target_path:
+            payload["target_path"] = target_path
+        if position:
+            payload["position"] = position
+        if rotation:
+            payload["rotation"] = rotation
+        return self._post("/scene/set-transform", payload)
+
+    def delete_object(self, *, target_name: Optional[str] = None, target_path: Optional[str] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if target_name:
+            payload["target_name"] = target_name
+        if target_path:
+            payload["target_path"] = target_path
+        return self._post("/scene/delete-object", payload)
+
+    def set_lighting(
+        self,
+        *,
+        brightness: Optional[float] = None,
+        exposure_compensation: Optional[float] = None,
+        ambient: Optional[list[float]] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {}
+        if brightness is not None:
+            payload["brightness"] = float(brightness)
+        if exposure_compensation is not None:
+            payload["exposure_compensation"] = float(exposure_compensation)
+        if ambient:
+            payload["ambient"] = ambient
+        return self._post("/environment/set-lighting", payload)
+
+    def generate_terrain(
+        self,
+        *,
+        center: Optional[list[float]] = None,
+        size: Optional[list[float]] = None,
+        material: str = "Grass",
+    ) -> Dict[str, Any]:
+        return self._post(
+            "/terrain/generate-terrain",
+            {
+                "center": center or [0, 0, 0],
+                "size": size or [256, 64, 256],
+                "material": material,
+            },
+        )
+
+    def insert_script(
+        self,
+        *,
+        source: str,
+        name: str = "GeneratedScript",
+        parent_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"source": source, "name": name}
+        if parent_path:
+            payload["parent_path"] = parent_path
+        return self._post("/script/insert-script", payload)
+
+    def publish_place(self) -> Dict[str, Any]:
+        return self._post("/asset/publish-place", {})
+
+    def blender_import(self, *, file_path: str, scale: Optional[float] = None) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"file_path": file_path}
+        if scale is not None:
+            payload["scale"] = float(scale)
+        return self._post("/blender/import", payload)
+
+    def pull_commands(self, client_id: str = "python-client", limit: int = 20) -> Dict[str, Any]:
+        return self._get("/commands", {"client_id": client_id, "limit": max(1, min(100, int(limit)))})
+
+    def report_result(
+        self,
+        *,
+        command_id: str,
+        ok: bool,
+        result: Optional[Dict[str, Any]] = None,
+        error: Optional[str] = None,
+        requeue: bool = False,
+    ) -> Dict[str, Any]:
+        return self._post(
+            "/results",
+            {
+                "command_id": command_id,
+                "ok": bool(ok),
+                "status": "ok" if ok else "error",
+                "result": result,
+                "error": error,
+                "requeue": requeue,
+            },
+        )

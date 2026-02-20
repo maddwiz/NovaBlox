@@ -1,0 +1,20 @@
+{
+  "name": "novablox",
+  "version": "1.0.0",
+  "description": "Roblox Studio bridge server and integrations for autonomous AI control",
+  "private": true,
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "check": "node --check server/index.js && node --check server/command_store.js && node --check extensions/openclaw/roblox-bridge/index.js && node --check examples/mock/mock_studio_client.js",
+    "mock:studio": "node examples/mock/mock_studio_client.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@sinclair/typebox": "^0.34.41",
+    "express": "^4.21.2",
+    "multer": "^1.4.5-lts.2"
+  }
+}
