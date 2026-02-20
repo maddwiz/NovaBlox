@@ -24,3 +24,5 @@ ROBLOXBRIDGE_HOST=localhost ROBLOXBRIDGE_PORT=30010 python novablox_mcp.py
 - `roblox_insert_script`
 - `roblox_publish_place`
 - `roblox_command_status`
+- `roblox_test_spawn`
+- `roblox_import_blender`

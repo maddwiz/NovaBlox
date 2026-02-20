@@ -9,6 +9,7 @@ local InsertService = game:GetService("InsertService")
 local Terrain = workspace.Terrain
 
 local VERSION = "1.0.0"
+local BLENDER_TO_ROBLOX_SCALE = 3.571428
 local DEFAULT_HOST = "http://localhost:30010"
 local DEFAULT_POLL_SECONDS = 2
 local DEFAULT_BATCH_SIZE = 20
@@ -95,7 +96,7 @@ local function parseVector3(input)
   if type(input) ~= "table" then
     return nil
   end
-  if input.x and input.y and input.z then
+  if input.x ~= nil and input.y ~= nil and input.z ~= nil then
     return Vector3.new(tonumber(input.x) or 0, tonumber(input.y) or 0, tonumber(input.z) or 0)
   end
   if input[1] and input[2] and input[3] then
@@ -109,7 +110,7 @@ local function parseColor3(input)
     return input
   end
   if type(input) == "table" then
-    if input.r and input.g and input.b then
+    if input.r ~= nil and input.g ~= nil and input.b ~= nil then
       return Color3.new(tonumber(input.r) or 0, tonumber(input.g) or 0, tonumber(input.b) or 0)
     end
     if input[1] and input[2] and input[3] then
@@ -234,6 +235,86 @@ local function setTransform(target, payload)
       end
     end
   end
+end
+
+local function parseScaleFactor(payload)
+  local mode = tostring(payload.scale_fix or "blender_to_roblox")
+  local direct = tonumber(payload.scale_factor)
+  if direct and direct > 0 then
+    return direct, mode
+  end
+  local shorthand = tonumber(payload.scale)
+  if shorthand and shorthand > 0 then
+    return shorthand, mode
+  end
+  if mode == "blender_to_roblox" then
+    return BLENDER_TO_ROBLOX_SCALE, mode
+  end
+  if mode == "none" then
+    return 1, mode
+  end
+  return 1, mode
+end
+
+local function scaleBasePartAroundPivot(basePart, pivot, factor)
+  local rel = pivot:PointToObjectSpace(basePart.Position)
+  local rotationOnly = basePart.CFrame - basePart.Position
+  basePart.Size = basePart.Size * factor
+  local newPos = pivot:PointToWorldSpace(rel * factor)
+  basePart.CFrame = CFrame.new(newPos) * rotationOnly
+end
+
+local function applyScaleToRoot(root, factor)
+  if not root or not factor or math.abs(factor - 1) < 0.0001 then
+    return 0
+  end
+
+  local scaledCount = 0
+  if root:IsA("Model") then
+    local okScaleTo = pcall(function()
+      root:ScaleTo(factor)
+    end)
+    if okScaleTo then
+      return -1
+    end
+    local pivot = root:GetPivot()
+    for _, descendant in ipairs(root:GetDescendants()) do
+      if descendant:IsA("BasePart") then
+        scaleBasePartAroundPivot(descendant, pivot, factor)
+        scaledCount += 1
+      end
+    end
+    return scaledCount
+  end
+
+  if root:IsA("BasePart") then
+    root.Size = root.Size * factor
+    return 1
+  end
+
+  for _, descendant in ipairs(root:GetDescendants()) do
+    if descendant:IsA("Model") then
+      local ok = pcall(function()
+        descendant:ScaleTo(factor)
+      end)
+      if ok then
+        scaledCount += 1
+      else
+        local pivot = descendant:GetPivot()
+        for _, nested in ipairs(descendant:GetDescendants()) do
+          if nested:IsA("BasePart") then
+            scaleBasePartAroundPivot(nested, pivot, factor)
+            scaledCount += 1
+          end
+        end
+      end
+    elseif descendant:IsA("BasePart") then
+      descendant.Size = descendant.Size * factor
+      scaledCount += 1
+    end
+  end
+
+  return scaledCount
 end
 
 local function safeEnumMaterial(name, fallback)
@@ -459,6 +540,35 @@ local function execute(command)
     return { asset_id = assetId, inserted = inserted:GetFullName() }
   end
 
+  if action == "import-blender" then
+    local parent = resolveParent(payload)
+    local scaleFactor, scaleMode = parseScaleFactor(payload)
+    local assetId = tonumber(payload.asset_id or payload.id)
+
+    if assetId then
+      local inserted = InsertService:LoadAsset(assetId)
+      inserted.Name = payload.name or inserted.Name
+      inserted.Parent = parent
+      local scaled = applyScaleToRoot(inserted, scaleFactor)
+      return {
+        asset_id = assetId,
+        inserted = inserted:GetFullName(),
+        scale_mode = scaleMode,
+        scale_factor = scaleFactor,
+        scaled = scaled,
+      }
+    end
+
+    return {
+      accepted = true,
+      message = "Blender file queued. Studio local OBJ/FBX import still requires manual import UI in many Studio builds.",
+      file_path = payload.file_path,
+      scale_mode = scaleMode,
+      scale_factor = scaleFactor,
+      hint = "After manual import, queue /bridge/scene/set-transform or /bridge/asset/import-blender with asset_id for automatic scale fix.",
+    }
+  end
+
   if action == "import-model" or action == "import-from-url" or action == "import" then
     -- Studio plugins cannot reliably import arbitrary local OBJ/FBX files with a stable public API.
     -- This command is preserved so AI flows can queue imports and then continue after user confirms import.
@@ -467,6 +577,7 @@ local function execute(command)
       message = "Import queued. If file import is needed, complete Studio import UI manually then continue automation.",
       file_path = payload.file_path,
       url = payload.url,
+      recommended_blender_scale = BLENDER_TO_ROBLOX_SCALE,
     }
   end
 
@@ -663,9 +774,89 @@ local function execute(command)
   end
 
   if action == "screenshot" or action == "render-frame" then
+    local externalCaptureUrl = payload.external_capture_url
+    if externalCaptureUrl and type(externalCaptureUrl) == "string" and externalCaptureUrl ~= "" then
+      local camera = workspace.CurrentCamera
+      local cameraPos = nil
+      if camera then
+        cameraPos = { camera.CFrame.X, camera.CFrame.Y, camera.CFrame.Z }
+      end
+      local capturePayload = HttpService:JSONEncode({
+        source = "NovaBlox",
+        action = action,
+        plugin_version = VERSION,
+        requested_output = payload.output_name,
+        timestamp = nowIso(),
+        camera_position = cameraPos,
+      })
+      local ok, err = pcall(function()
+        HttpService:PostAsync(
+          externalCaptureUrl,
+          capturePayload,
+          Enum.HttpContentType.ApplicationJson,
+          false,
+          {
+            ["X-NovaBlox-Source"] = "roblox-plugin",
+            ["X-NovaBlox-Version"] = VERSION,
+          }
+        )
+      end)
+      return {
+        accepted = true,
+        external_capture_triggered = ok,
+        external_capture_url = externalCaptureUrl,
+        error = ok and nil or tostring(err),
+        message = ok and "External capture trigger sent." or "External capture trigger failed.",
+        fallback_note = "Native plugin screenshot APIs vary by Studio version; use external capture daemon or Studio screenshot plugin.",
+      }
+    end
+
     return {
       accepted = true,
-      message = "Viewport capture is not exposed as a stable public plugin API. Use external capture for now.",
+      message = "Native screenshot APIs vary across Studio builds. Use external_capture_url for daemon trigger, or manual capture fallback.",
+      fallback_note = "Some newer Studio builds expose capture APIs via plugins/ViewportFrame workflows, but availability is not consistent.",
+    }
+  end
+
+  if action == "test-spawn" then
+    local parent = resolveParent(payload)
+    local marker = Instance.new("Part")
+    marker.Name = payload.name or "NovaBloxConnected"
+    marker.Size = parseVector3(payload.size) or Vector3.new(6, 1, 6)
+    marker.Position = parseVector3(payload.position) or Vector3.new(0, 8, 0)
+    marker.Material = Enum.Material.Neon
+    marker.Color = parseColor3(payload.color) or Color3.fromRGB(0, 255, 170)
+    marker.Anchored = true
+    marker.CanCollide = false
+    marker.Parent = parent
+
+    local light = Instance.new("PointLight")
+    light.Brightness = tonumber(payload.brightness) or 3
+    light.Range = tonumber(payload.range) or 20
+    light.Color = marker.Color
+    light.Parent = marker
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "NovaBloxStatus"
+    billboard.Size = UDim2.new(0, 220, 0, 50)
+    billboard.StudsOffset = Vector3.new(0, 3, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = marker
+
+    local text = Instance.new("TextLabel")
+    text.Size = UDim2.new(1, 0, 1, 0)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.new(1, 1, 1)
+    text.TextStrokeTransparency = 0.4
+    text.Font = Enum.Font.GothamBold
+    text.TextScaled = true
+    text.Text = payload.text or "NovaBlox Connected"
+    text.Parent = billboard
+
+    return {
+      spawned = marker:GetFullName(),
+      billboard = billboard:GetFullName(),
+      message = "NovaBlox test spawn complete",
     }
   end
 

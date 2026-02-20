@@ -2,13 +2,17 @@
 
 NovaBlox is a Roblox Studio bridge for AI agents (OpenClaw/MCP/custom LLM agents).  
 It exposes HTTP endpoints that queue Studio commands, then a Roblox Studio plugin pulls and executes those commands in real time.
+Version: `1.0.0`
 
 ## What you get
 
 - Queue-based bridge server (`server/index.js`)
 - Roblox Studio local plugin (`plugin/RobloxStudioBridge.lua`)
+- Plugin metadata (`plugin/NovaBlox.plugin.json`)
 - SSE notifications + polling fallback
 - 40+ command endpoints (scene, assets, terrain, lighting, scripts, viewport, publish/save)
+- Blender pipeline endpoint (`POST /bridge/asset/import-blender`) with scale-fix payload support
+- Instant connectivity endpoint (`POST /bridge/test-spawn`)
 - OpenClaw extension (`extensions/openclaw/roblox-bridge`)
 - Python SDK (`python-sdk`)
 - MCP server (`mcp-server`)
@@ -61,10 +65,11 @@ See `.env.example`.
 - `docs/SETUP_WINDOWS.md`
 - `docs/SETUP_MACOS.md`
 - `docs/SETUP_LINUX.md`
+- `docs/RELEASE_NOTES_v1.0.0.md`
 - `BuyerGuide.md`
 - `docs/RELEASE_CHECKLIST.md`
 
 ## Notes
 
 - Roblox plugin APIs for direct file import and screenshot capture are not consistently exposed across Studio versions.  
-  NovaBlox keeps these commands in the API surface and returns actionable result messages when manual/alternate capture flow is required.
+  NovaBlox keeps these commands in the API surface, supports optional `external_capture_url` trigger payloads, and returns fallback guidance when manual/alternate capture is required.

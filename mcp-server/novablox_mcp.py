@@ -135,6 +135,36 @@ def roblox_command_status(command_id: str) -> Dict[str, Any]:
     return _wrap(lambda: client.command_status(command_id))
 
 
+@mcp.tool()
+def roblox_test_spawn(
+    text: str = "NovaBlox Connected",
+    x: float = 0.0,
+    y: float = 8.0,
+    z: float = 0.0,
+    color: str = "Bright bluish green",
+) -> Dict[str, Any]:
+    """Queue an instant connectivity marker in Studio."""
+    return _wrap(lambda: client.test_spawn(text=text, position=[x, y, z], color=color))
+
+
+@mcp.tool()
+def roblox_import_blender(
+    file_path: Optional[str] = None,
+    asset_id: Optional[int] = None,
+    scale_factor: float = 3.571428,
+    parent_path: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Queue blender import with scale fix support."""
+    return _wrap(
+        lambda: client.blender_import(
+            file_path=file_path,
+            asset_id=asset_id,
+            scale_factor=scale_factor,
+            parent_path=parent_path,
+        )
+    )
+
+
 def main() -> None:
     mcp.run()
 

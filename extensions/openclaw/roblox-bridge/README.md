@@ -11,6 +11,8 @@ This extension now exposes near 1:1 coverage of NovaBlox route groups:
 - Viewport (`/bridge/viewport/*`)
 - Workspace (`/bridge/workspace/*`)
 - Blender (`/bridge/blender/import`)
+- Blender asset route (`/bridge/asset/import-blender`)
+- Connectivity test (`/bridge/test-spawn`)
 - Queue control/status tools (`health`, `stats`, `recent`, `status`, `requeue`, `cancel`, `custom`)
 
 Every POST command tool accepts:

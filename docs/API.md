@@ -1,96 +1,15 @@
-# NovaBlox API
+# NovaBlox API (v1.0.0)
 
 Base URL: `http://localhost:30010`  
-All routes are under `/bridge/*`.  
-If `ROBLOXBRIDGE_API_KEY` is set, send `X-API-Key`.
+Auth: if `ROBLOXBRIDGE_API_KEY` is set, include header `X-API-Key: <key>`.
 
-## Core bridge routes
+## Quick conventions
 
-- `GET /bridge/health`
-- `GET /bridge/stats`
-- `GET /bridge/stream` (SSE notifications)
-- `POST /bridge/command`
-- `POST /bridge/commands/batch`
-- `GET /bridge/commands?client_id=studio-1&limit=20`
-- `GET /bridge/commands/recent?limit=50`
-- `GET /bridge/commands/:id`
-- `POST /bridge/results`
-- `POST /bridge/commands/:id/requeue`
-- `POST /bridge/commands/:id/cancel`
+- Most `POST /bridge/...` command routes return a queued command object.
+- Roblox Studio plugin pulls queued commands from `GET /bridge/commands`.
+- Plugin reports completion to `POST /bridge/results`.
+- Queue response shape is consistent across command endpoints:
 
-## Scene routes
-
-- `POST /bridge/scene/spawn-object`
-- `POST /bridge/scene/set-property`
-- `POST /bridge/scene/set-transform`
-- `POST /bridge/scene/set-color`
-- `POST /bridge/scene/set-material`
-- `POST /bridge/scene/set-size`
-- `POST /bridge/scene/set-anchored`
-- `POST /bridge/scene/set-collidable`
-- `POST /bridge/scene/group-objects`
-- `POST /bridge/scene/duplicate-object`
-- `POST /bridge/scene/delete-object`
-- `POST /bridge/scene/select-object`
-- `POST /bridge/scene/clear-selection`
-- `POST /bridge/scene/rename-object`
-- `POST /bridge/scene/create-folder`
-- `POST /bridge/scene/parent-object`
-
-## Asset routes
-
-- `POST /bridge/asset/import-model`
-- `POST /bridge/asset/import-model/upload` (multipart file)
-- `POST /bridge/asset/import-from-url`
-- `POST /bridge/asset/insert-toolbox-asset`
-- `POST /bridge/asset/insert-asset-id`
-- `POST /bridge/asset/create-script`
-- `POST /bridge/asset/create-local-script`
-- `POST /bridge/asset/create-module-script`
-- `POST /bridge/asset/save-place`
-- `POST /bridge/asset/export-place`
-- `POST /bridge/asset/publish-place`
-- `POST /bridge/asset/upload-result` (multipart file from plugin/export flow)
-
-## Terrain routes
-
-- `POST /bridge/terrain/generate-terrain`
-- `POST /bridge/terrain/fill-region`
-- `POST /bridge/terrain/replace-material`
-- `POST /bridge/terrain/clear-region`
-
-## Environment routes
-
-- `POST /bridge/environment/set-lighting`
-- `POST /bridge/environment/set-atmosphere`
-- `POST /bridge/environment/set-skybox`
-- `POST /bridge/environment/set-time`
-- `POST /bridge/environment/set-fog`
-
-## Script/simulation routes
-
-- `POST /bridge/script/insert-script`
-- `POST /bridge/script/insert-local-script`
-- `POST /bridge/script/insert-module-script`
-- `POST /bridge/script/run-command`
-- `POST /bridge/simulation/playtest/start`
-- `POST /bridge/simulation/playtest/stop`
-
-## Viewport/workspace routes
-
-- `POST /bridge/viewport/set-camera`
-- `POST /bridge/viewport/focus-selection`
-- `POST /bridge/viewport/screenshot`
-- `POST /bridge/viewport/render-frame`
-- `POST /bridge/workspace/autosave`
-
-## Blender route
-
-- `POST /bridge/blender/import` (multipart or `file_path`)
-
-## Common response format
-
-### Queue response
 ```json
 {
   "status": "queued",
@@ -102,7 +21,75 @@ If `ROBLOXBRIDGE_API_KEY` is set, send `X-API-Key`.
 }
 ```
 
-### Poll response
+## Core bridge endpoints
+
+### `GET /bridge/health`
+
+```bash
+curl -s http://localhost:30010/bridge/health | jq .
+```
+
+```json
+{
+  "status": "ok",
+  "product": "NovaBlox",
+  "service": "RobloxStudioBridge",
+  "version": "1.0.0",
+  "queue": { "total_commands": 0, "pending_count": 0 }
+}
+```
+
+### `GET /bridge/stats`
+
+```bash
+curl -s http://localhost:30010/bridge/stats | jq .
+```
+
+### `GET /bridge/stream` (SSE)
+
+```bash
+curl -N http://localhost:30010/bridge/stream
+```
+
+Example event:
+
+```text
+event: connected
+data: {"client_id":"studio-abc","ts":"2026-02-20T02:00:00.000Z"}
+```
+
+### `POST /bridge/command`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/command \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "route": "/bridge/scene/spawn-object",
+    "category": "scene",
+    "action": "spawn-object",
+    "payload": { "class_name": "Part", "name": "CmdPart" }
+  }' | jq .
+```
+
+### `POST /bridge/commands/batch`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/commands/batch \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "commands": [
+      {"route":"/bridge/scene/spawn-object","category":"scene","action":"spawn-object","payload":{"name":"Batch1"}},
+      {"route":"/bridge/environment/set-lighting","category":"environment","action":"set-lighting","payload":{"brightness":2.0}}
+    ]
+  }' | jq .
+```
+
+### `GET /bridge/commands`
+
+```bash
+curl -s 'http://localhost:30010/bridge/commands?client_id=studio-abc&limit=20' | jq .
+```
+
 ```json
 {
   "status": "ok",
@@ -113,37 +100,534 @@ If `ROBLOXBRIDGE_API_KEY` is set, send `X-API-Key`.
       "id": "UUID",
       "category": "scene",
       "action": "spawn-object",
-      "payload": {
-        "class_name": "Part",
-        "position": [0, 8, 0]
-      }
+      "payload": { "name": "CmdPart" }
     }
   ]
 }
 ```
 
-### Result acknowledgement
+### `POST /bridge/results`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/results \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "command_id":"UUID",
+    "ok":true,
+    "status":"ok",
+    "result":{"path":"Workspace.CmdPart"},
+    "error":null
+  }' | jq .
+```
+
+### `GET /bridge/commands/recent`
+
+```bash
+curl -s 'http://localhost:30010/bridge/commands/recent?limit=10' | jq .
+```
+
+### `GET /bridge/commands/:id`
+
+```bash
+curl -s http://localhost:30010/bridge/commands/UUID | jq .
+```
+
+### `POST /bridge/commands/:id/requeue`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/commands/UUID/requeue | jq .
+```
+
+### `POST /bridge/commands/:id/cancel`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/commands/UUID/cancel | jq .
+```
+
+## Scene command endpoints
+
+### `POST /bridge/scene/spawn-object`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/spawn-object \
+  -H 'Content-Type: application/json' \
+  -d '{"class_name":"Part","name":"TowerBrick","position":[0,12,0],"size":[6,2,6],"color":"Bright red","anchored":true}' | jq .
+```
+
+### `POST /bridge/scene/set-property`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-property \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","property":"Transparency","value":0.2}' | jq .
+```
+
+### `POST /bridge/scene/set-transform`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-transform \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","position":[0,16,0],"rotation":[0,45,0]}' | jq .
+```
+
+### `POST /bridge/scene/set-color`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-color \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","color":"Bright blue"}' | jq .
+```
+
+### `POST /bridge/scene/set-material`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-material \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","material":"Neon"}' | jq .
+```
+
+### `POST /bridge/scene/set-size`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-size \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","size":[8,2,8]}' | jq .
+```
+
+### `POST /bridge/scene/set-anchored`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-anchored \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","anchored":true}' | jq .
+```
+
+### `POST /bridge/scene/set-collidable`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/set-collidable \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","can_collide":false}' | jq .
+```
+
+### `POST /bridge/scene/group-objects`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/group-objects \
+  -H 'Content-Type: application/json' \
+  -d '{"group_name":"TowerGroup","target_paths":["Workspace/TowerBrick","Workspace/TowerBrick_Copy"]}' | jq .
+```
+
+### `POST /bridge/scene/duplicate-object`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/duplicate-object \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","new_name":"TowerBrick_Copy"}' | jq .
+```
+
+### `POST /bridge/scene/delete-object`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/delete-object \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick_Copy"}' | jq .
+```
+
+### `POST /bridge/scene/select-object`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/select-object \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick"}' | jq .
+```
+
+### `POST /bridge/scene/clear-selection`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/clear-selection \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+### `POST /bridge/scene/rename-object`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/rename-object \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBrick","new_name":"TowerBase"}' | jq .
+```
+
+### `POST /bridge/scene/create-folder`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/create-folder \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"NovaBloxGenerated","parent_path":"Workspace"}' | jq .
+```
+
+### `POST /bridge/scene/parent-object`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/scene/parent-object \
+  -H 'Content-Type: application/json' \
+  -d '{"target_name":"TowerBase","parent_path":"Workspace/NovaBloxGenerated"}' | jq .
+```
+
+## Asset command endpoints
+
+### `POST /bridge/asset/import-model`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/import-model \
+  -H 'Content-Type: application/json' \
+  -d '{"file_path":"/tmp/model.fbx"}' | jq .
+```
+
+### `POST /bridge/asset/import-model/upload`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/import-model/upload \
+  -F file=@./model.fbx | jq .
+```
+
+### `POST /bridge/asset/import-blender` (new)
+
+Upload file flow:
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/import-blender \
+  -F file=@./character.fbx \
+  -F scale_fix=blender_to_roblox \
+  -F scale_factor=3.571428 | jq .
+```
+
+Asset ID flow (InsertService + scale fix):
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/import-blender \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "asset_id": 1234567890,
+    "scale_fix": "blender_to_roblox",
+    "scale_factor": 3.571428,
+    "parent_path": "Workspace"
+  }' | jq .
+```
+
+### `POST /bridge/blender/import` (legacy alias)
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/blender/import \
+  -F file=@./character.obj \
+  -F scale_fix=blender_to_roblox | jq .
+```
+
+### `POST /bridge/asset/import-from-url`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/import-from-url \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com/mesh.obj"}' | jq .
+```
+
+### `POST /bridge/asset/insert-toolbox-asset`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/insert-toolbox-asset \
+  -H 'Content-Type: application/json' \
+  -d '{"asset_id":1234567890}' | jq .
+```
+
+### `POST /bridge/asset/insert-asset-id`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/insert-asset-id \
+  -H 'Content-Type: application/json' \
+  -d '{"asset_id":1234567890}' | jq .
+```
+
+### `POST /bridge/asset/create-script`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/create-script \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"ServerBoot","source":"print(\"hello\")","parent_path":"ServerScriptService"}' | jq .
+```
+
+### `POST /bridge/asset/create-local-script`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/create-local-script \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"ClientBoot","source":"print(\"client\")","parent_path":"StarterPlayer/StarterPlayerScripts"}' | jq .
+```
+
+### `POST /bridge/asset/create-module-script`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/create-module-script \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"SharedModule","source":"return {}","parent_path":"ReplicatedStorage"}' | jq .
+```
+
+### `POST /bridge/asset/save-place`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/save-place \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+### `POST /bridge/asset/export-place`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/export-place \
+  -H 'Content-Type: application/json' \
+  -d '{"file_path":"C:/temp/NovaBloxExport.rbxl"}' | jq .
+```
+
+### `POST /bridge/asset/publish-place`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/publish-place \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+### `POST /bridge/asset/upload-result`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/asset/upload-result \
+  -F file=@./capture.png | jq .
+```
+
+## Terrain endpoints
+
+### `POST /bridge/terrain/generate-terrain`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/terrain/generate-terrain \
+  -H 'Content-Type: application/json' \
+  -d '{"center":[0,0,0],"size":[512,64,512],"material":"Grass"}' | jq .
+```
+
+### `POST /bridge/terrain/fill-region`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/terrain/fill-region \
+  -H 'Content-Type: application/json' \
+  -d '{"center":[20,0,20],"size":[128,32,128],"material":"Ground"}' | jq .
+```
+
+### `POST /bridge/terrain/replace-material`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/terrain/replace-material \
+  -H 'Content-Type: application/json' \
+  -d '{"from_material":"Grass","to_material":"Sand"}' | jq .
+```
+
+### `POST /bridge/terrain/clear-region`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/terrain/clear-region \
+  -H 'Content-Type: application/json' \
+  -d '{"center":[0,0,0],"size":[64,32,64]}' | jq .
+```
+
+## Environment endpoints
+
+### `POST /bridge/environment/set-lighting`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/environment/set-lighting \
+  -H 'Content-Type: application/json' \
+  -d '{"brightness":2.5,"exposure_compensation":0.2,"ambient":[0.15,0.15,0.2]}' | jq .
+```
+
+### `POST /bridge/environment/set-atmosphere`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/environment/set-atmosphere \
+  -H 'Content-Type: application/json' \
+  -d '{"density":0.35,"color":[0.7,0.8,1.0]}' | jq .
+```
+
+### `POST /bridge/environment/set-skybox`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/environment/set-skybox \
+  -H 'Content-Type: application/json' \
+  -d '{"skybox_asset_id":123456789}' | jq .
+```
+
+### `POST /bridge/environment/set-time`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/environment/set-time \
+  -H 'Content-Type: application/json' \
+  -d '{"clock_time":18.25}' | jq .
+```
+
+### `POST /bridge/environment/set-fog`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/environment/set-fog \
+  -H 'Content-Type: application/json' \
+  -d '{"fog_start":10,"fog_end":200,"fog_color":[0.6,0.7,0.8]}' | jq .
+```
+
+## Script + simulation endpoints
+
+### `POST /bridge/script/insert-script`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/script/insert-script \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"RoundManager","source":"print(\"round start\")","parent_path":"ServerScriptService"}' | jq .
+```
+
+### `POST /bridge/script/insert-local-script`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/script/insert-local-script \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"HUDClient","source":"print(\"hud\")","parent_path":"StarterPlayer/StarterPlayerScripts"}' | jq .
+```
+
+### `POST /bridge/script/insert-module-script`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/script/insert-module-script \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"UtilModule","source":"return { version = \"1\" }","parent_path":"ReplicatedStorage"}' | jq .
+```
+
+### `POST /bridge/script/run-command`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/script/run-command \
+  -H 'Content-Type: application/json' \
+  -d '{"command":"clear-selection"}' | jq .
+```
+
+### `POST /bridge/simulation/playtest/start`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/simulation/playtest/start \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+### `POST /bridge/simulation/playtest/stop`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/simulation/playtest/stop \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+## Viewport/workspace endpoints
+
+### `POST /bridge/viewport/set-camera`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/viewport/set-camera \
+  -H 'Content-Type: application/json' \
+  -d '{"position":[20,20,20],"look_at":[0,0,0],"field_of_view":70}' | jq .
+```
+
+### `POST /bridge/viewport/focus-selection`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/viewport/focus-selection \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+### `POST /bridge/viewport/screenshot`
+
+Simple fallback:
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/viewport/screenshot \
+  -H 'Content-Type: application/json' \
+  -d '{"output_name":"shot_001.png"}' | jq .
+```
+
+Optional external capture trigger:
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/viewport/screenshot \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "output_name":"shot_002.png",
+    "external_capture_url":"http://127.0.0.1:39000/capture"
+  }' | jq .
+```
+
+### `POST /bridge/viewport/render-frame`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/viewport/render-frame \
+  -H 'Content-Type: application/json' \
+  -d '{"output_name":"frame_001.png","external_capture_url":"http://127.0.0.1:39000/capture"}' | jq .
+```
+
+### `POST /bridge/workspace/autosave`
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/workspace/autosave \
+  -H 'Content-Type: application/json' \
+  -d '{}' | jq .
+```
+
+## Test endpoint
+
+### `POST /bridge/test-spawn`
+
+Creates a neon glowing part + BillboardGui text `"NovaBlox Connected"` inside Studio plugin execution.
+
+```bash
+curl -s -X POST http://localhost:30010/bridge/test-spawn \
+  -H 'Content-Type: application/json' \
+  -d '{"position":[0,8,0],"text":"NovaBlox Connected"}' | jq .
+```
+
+## Typical plugin result payloads
+
+Success:
+
 ```json
 {
   "command_id": "UUID",
   "ok": true,
   "status": "ok",
-  "result": { "path": "Workspace.Part" },
-  "error": null
+  "result": {
+    "spawned": "Workspace.NovaBloxConnected",
+    "message": "NovaBlox test spawn complete"
+  }
 }
 ```
 
-## Example: spawn part
+Fallback capture result:
 
-```bash
-curl -X POST http://localhost:30010/bridge/scene/spawn-object \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "class_name": "Part",
-    "name": "TowerBrick",
-    "position": [0, 12, 0],
-    "size": [6, 2, 6],
-    "color": "Bright red",
-    "anchored": true
-  }'
+```json
+{
+  "command_id": "UUID",
+  "ok": true,
+  "status": "ok",
+  "result": {
+    "accepted": true,
+    "fallback_note": "Native screenshot APIs vary across Studio builds."
+  }
+}
 ```
+
+## Notes
+
+- For `import-blender`:
+  - If `asset_id` is provided, plugin uses `InsertService` and applies scale fix automatically.
+  - If only local file path/upload is provided, plugin returns guidance for manual Studio import where API support is limited.
+- Recommended Blender scale fix: `3.571428` (`blender_to_roblox` mode).

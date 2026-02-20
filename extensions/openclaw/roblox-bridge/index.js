@@ -90,6 +90,7 @@ const POST_ROUTE_TOOLS = [
   ["roblox_scene_create_folder", "Scene Create Folder", "/bridge/scene/create-folder", "Queue a scene create-folder command."],
   ["roblox_scene_parent_object", "Scene Parent Object", "/bridge/scene/parent-object", "Queue a scene parent-object command."],
   ["roblox_asset_import_model", "Asset Import Model", "/bridge/asset/import-model", "Queue an asset import-model command."],
+  ["roblox_asset_import_blender", "Asset Import Blender", "/bridge/asset/import-blender", "Queue an asset import-blender command with optional scale fix."],
   ["roblox_asset_import_from_url", "Asset Import URL", "/bridge/asset/import-from-url", "Queue an asset import-from-url command."],
   ["roblox_asset_insert_toolbox_asset", "Asset Insert Toolbox", "/bridge/asset/insert-toolbox-asset", "Queue an asset insert-toolbox-asset command."],
   ["roblox_asset_insert_asset_id", "Asset Insert ID", "/bridge/asset/insert-asset-id", "Queue an asset insert-asset-id command."],
@@ -119,6 +120,7 @@ const POST_ROUTE_TOOLS = [
   ["roblox_viewport_screenshot", "Viewport Screenshot", "/bridge/viewport/screenshot", "Queue viewport screenshot command."],
   ["roblox_viewport_render_frame", "Viewport Render Frame", "/bridge/viewport/render-frame", "Queue viewport render-frame command."],
   ["roblox_workspace_autosave", "Workspace Autosave", "/bridge/workspace/autosave", "Queue workspace autosave command."],
+  ["roblox_test_spawn", "Bridge Test Spawn", "/bridge/test-spawn", "Queue a test-spawn command to verify plugin connectivity in Studio."],
   ["roblox_blender_import", "Blender Import", "/bridge/blender/import", "Queue blender import by file_path."],
 ];
 

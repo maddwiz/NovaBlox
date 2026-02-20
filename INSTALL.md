@@ -27,7 +27,7 @@ Shortcuts:
 
 ```bash
 curl -s http://localhost:30010/bridge/health | jq .
-curl -s -X POST http://localhost:30010/bridge/scene/spawn-object \
+curl -s -X POST http://localhost:30010/bridge/test-spawn \
   -H 'Content-Type: application/json' \
-  -d '{"class_name":"Part","name":"InstallTest","position":[0,8,0],"anchored":true}' | jq .
+  -d '{"text":"NovaBlox Connected","position":[0,8,0]}' | jq .
 ```

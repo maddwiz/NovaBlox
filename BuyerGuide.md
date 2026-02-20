@@ -12,11 +12,11 @@
 1. `curl http://localhost:30010/bridge/health`
 2. Queue a command:
    ```bash
-   curl -X POST http://localhost:30010/bridge/scene/spawn-object \
+   curl -X POST http://localhost:30010/bridge/test-spawn \
      -H 'Content-Type: application/json' \
-     -d '{"class_name":"Part","name":"BuyerGuidePart","position":[0,10,0],"anchored":true}'
+     -d '{"text":"NovaBlox Connected","position":[0,8,0]}'
    ```
-3. In Studio, confirm object appears.
+3. In Studio, confirm glowing marker + "NovaBlox Connected" text appears.
 4. Check command completion:
    ```bash
    curl http://localhost:30010/bridge/commands/recent?limit=5
@@ -27,9 +27,18 @@
 1. Export `.obj` or `.fbx` from Blender.
 2. Upload into NovaBlox:
    ```bash
-   curl -X POST http://localhost:30010/bridge/blender/import -F file=@./character.fbx
+   curl -X POST http://localhost:30010/bridge/asset/import-blender \
+     -F file=@./character.fbx \
+     -F scale_fix=blender_to_roblox \
+     -F scale_factor=3.571428
    ```
 3. Plugin receives import command and reports status.
+4. If your Studio build cannot import local file via plugin API, import manually in Studio and then queue with `asset_id`:
+   ```bash
+   curl -X POST http://localhost:30010/bridge/asset/import-blender \
+     -H 'Content-Type: application/json' \
+     -d '{"asset_id":1234567890,"scale_fix":"blender_to_roblox","scale_factor":3.571428}'
+   ```
 
 ## OpenClaw
 

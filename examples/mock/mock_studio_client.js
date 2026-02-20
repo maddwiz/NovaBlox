@@ -243,6 +243,31 @@ function execute(command) {
     return { script: scriptRecord };
   }
 
+  if (action === "test-spawn") {
+    const created = upsertObject("NovaBloxConnected", {
+      class_name: "Part",
+      position: payload.position || [0, 8, 0],
+      size: payload.size || [6, 1, 6],
+      color: payload.color || "Bright bluish green",
+      anchored: true,
+      can_collide: false,
+      material: "Neon",
+      properties: { billboard_text: payload.text || "NovaBlox Connected" },
+    });
+    return { spawned: created.name, message: "NovaBlox test spawn complete (mock)" };
+  }
+
+  if (action === "import-blender") {
+    return {
+      accepted: true,
+      action,
+      scale_fix: payload.scale_fix || "blender_to_roblox",
+      scale_factor: payload.scale_factor || 3.571428,
+      file_path: payload.file_path || null,
+      asset_id: payload.asset_id || null,
+    };
+  }
+
   if (action === "playtest-start" || action === "playtest-stop" || action === "set-camera" || action === "focus-selection" || action === "screenshot" || action === "render-frame" || action === "publish-place" || action === "save-place" || action === "export-place" || action === "autosave" || action === "import-model" || action === "import-from-url" || action === "import") {
     return { accepted: true, action };
   }

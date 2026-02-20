@@ -25,7 +25,7 @@ scripts\start-server-windows.bat
 
 ```powershell
 curl http://localhost:30010/bridge/health
-curl -X POST http://localhost:30010/bridge/scene/spawn-object `
+curl -X POST http://localhost:30010/bridge/test-spawn `
   -H "Content-Type: application/json" `
-  -d "{\"class_name\":\"Part\",\"name\":\"WinSmoke\",\"position\":[0,8,0],\"anchored\":true}"
+  -d "{\"text\":\"NovaBlox Connected\",\"position\":[0,8,0]}"
 ```

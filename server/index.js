@@ -17,6 +17,7 @@ const MAX_RETENTION = parseInt(process.env.ROBLOXBRIDGE_MAX_RETENTION || "10000"
 const IMPORT_DIR = process.env.ROBLOXBRIDGE_IMPORT_DIR || path.join(os.tmpdir(), "novablox-imports");
 const EXPORT_DIR = process.env.ROBLOXBRIDGE_EXPORT_DIR || path.join(os.tmpdir(), "novablox-exports");
 const MAX_UPLOAD_MB = parseInt(process.env.ROBLOXBRIDGE_MAX_UPLOAD_MB || "250", 10);
+const BLENDER_TO_ROBLOX_SCALE = Number.parseFloat(process.env.ROBLOXBRIDGE_BLENDER_SCALE || "3.571428");
 
 fs.mkdirSync(IMPORT_DIR, { recursive: true });
 fs.mkdirSync(EXPORT_DIR, { recursive: true });
@@ -62,6 +63,14 @@ function parseInteger(value, fallback, min, max) {
 
 function inferClientId(req) {
   return req.query.client_id || req.get("X-Client-Id") || "roblox-studio";
+}
+
+function parseFloatSafe(value, fallback) {
+  const parsed = Number.parseFloat(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return parsed;
 }
 
 function queueCommand(req, res, spec, extraPayload = {}) {
@@ -136,6 +145,7 @@ const commandRoutes = [
   { path: "/bridge/viewport/screenshot", category: "viewport", action: "screenshot" },
   { path: "/bridge/viewport/render-frame", category: "viewport", action: "render-frame" },
   { path: "/bridge/workspace/autosave", category: "workspace", action: "autosave" },
+  { path: "/bridge/test-spawn", category: "test", action: "test-spawn" },
 ];
 
 app.get("/bridge/health", (_req, res) => {
@@ -294,11 +304,59 @@ app.post("/bridge/blender/import", requireApiKey, upload.single("file"), (req, r
     return res.status(400).json({ status: "error", error: "Provide multipart file upload or file_path" });
   }
 
+  const scaleFix = req.body.scale_fix || "blender_to_roblox";
+  const rawScale = req.body.scale_factor !== undefined ? req.body.scale_factor : req.body.scale;
+  const scaleFactor = parseFloatSafe(rawScale, scaleFix === "blender_to_roblox" ? BLENDER_TO_ROBLOX_SCALE : 1.0);
+
   return queueCommand(
     req,
     res,
-    { path: "/bridge/blender/import", category: "blender", action: "import" },
-    { file_path: localPath }
+    { path: "/bridge/blender/import", category: "blender", action: "import-blender" },
+    {
+      file_path: localPath,
+      scale_fix: scaleFix,
+      scale_factor: scaleFactor,
+      recommended_blender_to_roblox_scale: BLENDER_TO_ROBLOX_SCALE,
+    }
+  );
+});
+
+app.post("/bridge/asset/import-blender", requireApiKey, upload.single("file"), (req, res) => {
+  const scaleFix = req.body.scale_fix || "blender_to_roblox";
+  const rawScale = req.body.scale_factor !== undefined ? req.body.scale_factor : req.body.scale;
+  const scaleFactor = parseFloatSafe(rawScale, scaleFix === "blender_to_roblox" ? BLENDER_TO_ROBLOX_SCALE : 1.0);
+  const assetId = req.body.asset_id !== undefined ? Number.parseInt(req.body.asset_id, 10) : null;
+
+  let localPath = req.body.file_path || null;
+  let originalName = null;
+  if (req.file && req.file.path) {
+    const extension = path.extname(req.file.originalname || "").toLowerCase();
+    const safeName = `${req.file.filename}${extension}`;
+    const finalPath = path.join(IMPORT_DIR, safeName);
+    fs.renameSync(req.file.path, finalPath);
+    localPath = finalPath;
+    originalName = req.file.originalname || null;
+  }
+
+  if (!localPath && !Number.isFinite(assetId)) {
+    return res.status(400).json({
+      status: "error",
+      error: "Provide multipart file upload, file_path, or asset_id",
+    });
+  }
+
+  return queueCommand(
+    req,
+    res,
+    { path: "/bridge/asset/import-blender", category: "asset", action: "import-blender" },
+    {
+      file_path: localPath,
+      asset_id: Number.isFinite(assetId) ? assetId : undefined,
+      original_name: originalName,
+      scale_fix: scaleFix,
+      scale_factor: scaleFactor,
+      recommended_blender_to_roblox_scale: BLENDER_TO_ROBLOX_SCALE,
+    }
   );
 });
 

@@ -206,11 +206,60 @@ class NovaBlox:
     def publish_place(self) -> Dict[str, Any]:
         return self._post("/asset/publish-place", {})
 
-    def blender_import(self, *, file_path: str, scale: Optional[float] = None) -> Dict[str, Any]:
+    def blender_import(
+        self,
+        *,
+        file_path: Optional[str] = None,
+        asset_id: Optional[int] = None,
+        scale_factor: Optional[float] = 3.571428,
+        scale_fix: str = "blender_to_roblox",
+        parent_path: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "scale_fix": scale_fix,
+        }
+        if file_path:
+            payload["file_path"] = file_path
+        if asset_id is not None:
+            payload["asset_id"] = int(asset_id)
+        if scale_factor is not None:
+            payload["scale_factor"] = float(scale_factor)
+        if parent_path:
+            payload["parent_path"] = parent_path
+        return self._post("/asset/import-blender", payload)
+
+    def blender_import_legacy(self, *, file_path: str, scale_factor: Optional[float] = None) -> Dict[str, Any]:
         payload: Dict[str, Any] = {"file_path": file_path}
-        if scale is not None:
-            payload["scale"] = float(scale)
+        if scale_factor is not None:
+            payload["scale_factor"] = float(scale_factor)
         return self._post("/blender/import", payload)
+
+    def test_spawn(
+        self,
+        *,
+        text: str = "NovaBlox Connected",
+        position: Optional[list[float]] = None,
+        color: str = "Bright bluish green",
+    ) -> Dict[str, Any]:
+        return self._post(
+            "/test-spawn",
+            {
+                "text": text,
+                "position": position or [0, 8, 0],
+                "color": color,
+            },
+        )
+
+    def viewport_screenshot(
+        self,
+        *,
+        output_name: str = "novablox-shot.png",
+        external_capture_url: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {"output_name": output_name}
+        if external_capture_url:
+            payload["external_capture_url"] = external_capture_url
+        return self._post("/viewport/screenshot", payload)
 
     def pull_commands(self, client_id: str = "python-client", limit: int = 20) -> Dict[str, Any]:
         return self._get("/commands", {"client_id": client_id, "limit": max(1, min(100, int(limit)))})

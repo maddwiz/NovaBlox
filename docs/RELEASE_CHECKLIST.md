@@ -4,6 +4,7 @@
 
 - [ ] `GET /bridge/health` returns `status=ok`
 - [ ] Plugin button appears in Studio (`Plugins > NovaBlox`)
+- [ ] `POST /bridge/test-spawn` creates glowing marker + "NovaBlox Connected" BillboardGui
 - [ ] Poll flow works (`/bridge/commands` -> plugin executes -> `/bridge/results`)
 - [ ] SSE stream connects and plugin still polls on message
 - [ ] Scene command smoke test (`spawn-object`, `set-property`, `delete-object`)
@@ -12,6 +13,8 @@
 - [ ] Script insert smoke test
 - [ ] Save/publish commands tested on Windows + macOS Studio
 - [ ] Blender import queue route tested with OBJ and FBX upload
+- [ ] `POST /bridge/asset/import-blender` tested with both upload and `asset_id` flows
+- [ ] Blender scale fix (`scale_fix=blender_to_roblox`, `scale_factor=3.571428`) validated on imported model
 
 ## Cross-platform QA
 
