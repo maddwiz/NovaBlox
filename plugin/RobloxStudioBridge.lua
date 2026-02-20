@@ -8,7 +8,7 @@ local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local InsertService = game:GetService("InsertService")
 local Terrain = workspace.Terrain
 
-local VERSION = "1.0.0"
+local VERSION = "1.0.1"
 local BLENDER_TO_ROBLOX_SCALE = 3.571428
 local DEFAULT_HOST = "http://localhost:30010"
 local DEFAULT_POLL_SECONDS = 2

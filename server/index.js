@@ -8,7 +8,7 @@ const multer = require("multer");
 
 const { CommandStore } = require("./command_store");
 
-const VERSION = "1.0.0";
+const VERSION = "1.0.1";
 const HOST = process.env.ROBLOXBRIDGE_HOST || "0.0.0.0";
 const PORT = parseInt(process.env.ROBLOXBRIDGE_PORT || "30010", 10);
 const API_KEY = process.env.ROBLOXBRIDGE_API_KEY || "";

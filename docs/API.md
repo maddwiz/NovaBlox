@@ -1,4 +1,4 @@
-# NovaBlox API (v1.0.0)
+# NovaBlox API (v1.0.1)
 
 Base URL: `http://localhost:30010`  
 Auth: if `ROBLOXBRIDGE_API_KEY` is set, include header `X-API-Key: <key>`.
@@ -34,7 +34,7 @@ curl -s http://localhost:30010/bridge/health | jq .
   "status": "ok",
   "product": "NovaBlox",
   "service": "RobloxStudioBridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "queue": { "total_commands": 0, "pending_count": 0 }
 }
 ```

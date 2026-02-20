@@ -34,7 +34,7 @@
 
 ## Packaging
 
-- [ ] `scripts/package_release.sh v1.0.0`
+- [ ] `scripts/package_release.sh v1.0.1`
 - [ ] Zip contains plugin, server, docs, extension, python SDK, MCP server
 - [ ] BuyerGuide and API docs updated to exact release behavior
 

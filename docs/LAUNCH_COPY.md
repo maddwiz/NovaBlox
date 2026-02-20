@@ -1,13 +1,13 @@
-# Launch Copy (v1.0.0)
+# Launch Copy (v1.0.1)
 
 ## X/Twitter Post
 
 OpenClaw now controls Roblox Studio end-to-end.  
-NovaBlox v1.0.0 is live: queue-based AI bridge + Studio plugin + OpenClaw extension + Python/MCP SDK.  
+NovaBlox v1.0.1 is live: queue-based AI bridge + Studio plugin + OpenClaw extension + Python/MCP SDK.  
 Spawn, script, terrain, lighting, publish, and automate your build loop.
 
 Repo: https://github.com/maddwiz/NovaBlox  
-Release: https://github.com/maddwiz/NovaBlox/releases/tag/v1.0.0
+Release: https://github.com/maddwiz/NovaBlox/releases/tag/v1.0.1
 
 #OpenClaw #RobloxDev #AIAgents #IndieDev
 
@@ -33,12 +33,12 @@ Roblox automation has been fragmented. Most tools stop at assets, not full Studi
 - MCP server
 
 5. CTA:
-Try `v1.0.0`, run the quick start, and share your first autonomous Roblox build.
+Try `v1.0.1`, run the quick start, and share your first autonomous Roblox build.
 
 ## Reddit (r/robloxgamedev) Draft
 
 Title:
-Released NovaBlox v1.0.0: AI bridge for Roblox Studio (OpenClaw + MCP + Python SDK)
+Released NovaBlox v1.0.1: AI bridge for Roblox Studio (OpenClaw + MCP + Python SDK)
 
 Body:
 I just released NovaBlox, a Roblox Studio bridge for AI-driven workflows.
@@ -58,10 +58,10 @@ If anyone wants to test and break it, I’d love feedback on Studio-specific edg
 ## Roblox DevForum Draft
 
 Title:
-NovaBlox v1.0.0 - AI bridge for Roblox Studio automation
+NovaBlox v1.0.1 - AI bridge for Roblox Studio automation
 
 Body:
-Launching NovaBlox v1.0.0 for AI-assisted Studio workflows.
+Launching NovaBlox v1.0.1 for AI-assisted Studio workflows.
 
 Core architecture:
 AI agent -> HTTP bridge -> command queue -> Studio plugin executor -> result ack

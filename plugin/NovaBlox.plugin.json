@@ -2,7 +2,7 @@
   "fileVersion": 1,
   "name": "NovaBlox RobloxStudioBridge",
   "friendlyName": "NovaBlox Bridge Plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local Roblox Studio plugin that executes queued NovaBlox bridge commands.",
   "entrypoint": "plugin/RobloxStudioBridge.lua",
   "author": "maddwiz",

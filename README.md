@@ -2,7 +2,7 @@
 
 NovaBlox is a Roblox Studio bridge for AI agents (OpenClaw/MCP/custom LLM agents).  
 It exposes HTTP endpoints that queue Studio commands, then a Roblox Studio plugin pulls and executes those commands in real time.
-Version: `1.0.0`
+Version: `1.0.1`
 
 ## What you get
 
@@ -66,6 +66,7 @@ See `.env.example`.
 - `docs/SETUP_MACOS.md`
 - `docs/SETUP_LINUX.md`
 - `docs/RELEASE_NOTES_v1.0.0.md`
+- `docs/RELEASE_NOTES_v1.0.1.md`
 - `BuyerGuide.md`
 - `docs/RELEASE_CHECKLIST.md`
 
