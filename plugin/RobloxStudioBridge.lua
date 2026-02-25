@@ -1445,10 +1445,10 @@ local function refreshWizardPanel()
   local stepReady = stepConfigured and stepHealth and stepEnabled
 
   PANEL.wizardStatusLabel.Text =
-    boolMark(stepConfigured) .. " Step 1: host/API key configured\n"
-    .. boolMark(stepHealth) .. " Step 2: Health + auth check passed\n"
-    .. boolMark(stepEnabled) .. " Step 3: Bridge enabled in Studio\n"
-    .. boolMark(stepReady) .. " Step 4: Run doctor + showcase in terminal"
+    boolMark(stepConfigured) .. " Step 1: Host/API key saved\n"
+    .. boolMark(stepHealth) .. " Step 2: Health/auth OK\n"
+    .. boolMark(stepEnabled) .. " Step 3: Bridge enabled\n"
+    .. boolMark(stepReady) .. " Step 4: Doctor + showcase"
 
   if not stepConfigured then
     PANEL.wizardCommandBox.Text = "npm run secure:local\nnpm run studio:sync\n# restart Studio, then click Save"
@@ -1823,7 +1823,7 @@ local function createPanel()
   PANEL.healthLabel = healthLabel
 
   local wizardFrame = Instance.new("Frame")
-  wizardFrame.Size = UDim2.new(1, 0, 0, 146)
+  wizardFrame.Size = UDim2.new(1, 0, 0, 160)
   wizardFrame.BackgroundColor3 = Color3.fromRGB(35, 43, 56)
   wizardFrame.BorderColor3 = Color3.fromRGB(84, 103, 134)
   wizardFrame.Parent = root
@@ -1840,11 +1840,11 @@ local function createPanel()
   wizardTitle.Parent = wizardFrame
 
   local wizardStatusLabel = Instance.new("TextLabel")
-  wizardStatusLabel.Size = UDim2.new(1, -8, 0, 56)
+  wizardStatusLabel.Size = UDim2.new(1, -8, 0, 64)
   wizardStatusLabel.Position = UDim2.new(0, 4, 0, 22)
   wizardStatusLabel.BackgroundTransparency = 1
   wizardStatusLabel.Font = Enum.Font.Code
-  wizardStatusLabel.TextSize = 11
+  wizardStatusLabel.TextSize = 10
   wizardStatusLabel.TextColor3 = Color3.fromRGB(226, 233, 250)
   wizardStatusLabel.TextXAlignment = Enum.TextXAlignment.Left
   wizardStatusLabel.TextYAlignment = Enum.TextYAlignment.Top
@@ -1854,8 +1854,8 @@ local function createPanel()
   PANEL.wizardStatusLabel = wizardStatusLabel
 
   local wizardCommandBox = Instance.new("TextBox")
-  wizardCommandBox.Size = UDim2.new(1, -8, 0, 40)
-  wizardCommandBox.Position = UDim2.new(0, 4, 0, 80)
+  wizardCommandBox.Size = UDim2.new(1, -8, 0, 44)
+  wizardCommandBox.Position = UDim2.new(0, 4, 0, 88)
   wizardCommandBox.BackgroundColor3 = Color3.fromRGB(22, 28, 38)
   wizardCommandBox.BorderColor3 = Color3.fromRGB(84, 103, 134)
   wizardCommandBox.ClearTextOnFocus = false
@@ -1875,7 +1875,7 @@ local function createPanel()
 
   local wizardCopyButton = Instance.new("TextButton")
   wizardCopyButton.Size = UDim2.new(0.48, -6, 0, 20)
-  wizardCopyButton.Position = UDim2.new(0, 4, 0, 124)
+  wizardCopyButton.Position = UDim2.new(0, 4, 0, 136)
   wizardCopyButton.BackgroundColor3 = Color3.fromRGB(54, 84, 122)
   wizardCopyButton.BorderColor3 = Color3.fromRGB(95, 127, 168)
   wizardCopyButton.Font = Enum.Font.GothamSemibold
@@ -1887,7 +1887,7 @@ local function createPanel()
 
   local wizardNextButton = Instance.new("TextButton")
   wizardNextButton.Size = UDim2.new(0.48, -6, 0, 20)
-  wizardNextButton.Position = UDim2.new(0.52, 2, 0, 124)
+  wizardNextButton.Position = UDim2.new(0.52, 2, 0, 136)
   wizardNextButton.BackgroundColor3 = Color3.fromRGB(70, 104, 164)
   wizardNextButton.BorderColor3 = Color3.fromRGB(110, 146, 214)
   wizardNextButton.Font = Enum.Font.GothamSemibold
