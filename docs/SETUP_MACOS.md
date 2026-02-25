@@ -8,6 +8,14 @@
 
 ## Server
 
+Simplest path (no terminal knowledge required):
+
+- Double-click `NovaBlox-OneClick-Setup.command` in the repo root.
+- To stop the bridge later, double-click `NovaBlox-Stop-Bridge.command`.
+- If macOS blocks the launcher, right-click the file -> `Open` -> `Open`.
+
+Terminal path:
+
 ```bash
 cd /path/to/NovaBlox
 chmod +x scripts/start-server-macos.command
@@ -24,6 +32,12 @@ One-click BYOK setup (recommended):
 
 ```bash
 npm run setup:oneclick
+```
+
+Same one-click flow via terminal launcher alias:
+
+```bash
+npm run macos:oneclick
 ```
 
 Manual local security defaults:

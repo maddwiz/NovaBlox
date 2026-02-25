@@ -14,6 +14,8 @@
     "bootstrap:macos-arm64": "bash scripts/bootstrap-macos-arm64.sh",
     "secure:local": "bash scripts/secure_local_env.sh",
     "setup:oneclick": "node scripts/setup_oneclick.js",
+    "macos:oneclick": "bash scripts/oneclick-macos.command",
+    "macos:stop": "bash scripts/stop-bridge-macos.command",
     "studio:sync": "node scripts/sync_studio_settings.js",
     "doctor": "node scripts/doctor.js",
     "showcase:run": "node scripts/run_showcase.js",

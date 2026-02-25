@@ -39,23 +39,24 @@ Version: `1.1.0`
    cd /path/to/NovaBlox
    npm install
    ```
-2. Run one-click BYOK setup (auto-detects cloud key or local model endpoint, then syncs Studio plugin settings):
+2. macOS no-terminal path (recommended for non-technical users): double-click `NovaBlox-OneClick-Setup.command` in Finder.
+3. If you are not using the macOS launcher, run one-click BYOK setup (auto-detects cloud key or local model endpoint, then syncs Studio plugin settings):
    ```bash
    npm run setup:oneclick
    ```
-3. Start bridge:
+4. Start bridge (skip if launcher already started it):
    ```bash
    npm start
    ```
-4. In Roblox Studio, save `plugin/RobloxStudioBridge.lua` as a Local Plugin.
-5. Enable Studio HTTP requests when prompted.
-6. (Optional if you skipped one-click setup) sync plugin settings from terminal:
+5. In Roblox Studio, save `plugin/RobloxStudioBridge.lua` as a Local Plugin.
+6. Enable Studio HTTP requests when prompted.
+7. (Optional if you skipped one-click setup) sync plugin settings from terminal:
    ```bash
    npm run studio:sync
    ```
    This sync step is required any time host/API key changes.
-7. Restart Roblox Studio, then open `Plugins > NovaBlox > Panel` and follow the **First-Run Wizard** (`Next Step`).
-8. Test from terminal:
+8. Restart Roblox Studio, then open `Plugins > NovaBlox > Panel` and follow the **First-Run Wizard** (`Next Step`).
+9. Test from terminal:
    ```bash
    API_KEY=$(awk -F= '/^ROBLOXBRIDGE_API_KEY=/{print $2}' .env)
    curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:30010/bridge/health | jq .
@@ -64,14 +65,17 @@ Version: `1.1.0`
      -H 'Content-Type: application/json' \
      -d '{"class_name":"Part","name":"BridgeTest","position":[0,8,0],"color":"Bright red","anchored":true}' | jq .
    ```
-9. Open browser tools:
-   - Studio planner UI: `http://127.0.0.1:30010/bridge/studio`
-   - API explorer: `http://127.0.0.1:30010/docs`
+10. Open browser tools:
+
+- Studio planner UI: `http://127.0.0.1:30010/bridge/studio`
+- API explorer: `http://127.0.0.1:30010/docs`
 
 ## OS launchers
 
 - Windows: `scripts/start-server-windows.bat`
 - macOS: `scripts/start-server-macos.command`
+- macOS one-click setup (double-click): `NovaBlox-OneClick-Setup.command`
+- macOS one-click stop: `NovaBlox-Stop-Bridge.command`
 - Linux: `scripts/start-server-linux.sh`
 
 ### macOS arm64 fast bootstrap
@@ -101,6 +105,11 @@ This writes `novablox_bridgeHost` and `novablox_apiKey` directly into Roblox plu
 ```bash
 npm run setup:oneclick
 ```
+
+macOS Finder launcher (same setup + starts bridge + opens Studio UI/docs):
+
+- `NovaBlox-OneClick-Setup.command`
+- stop later with `NovaBlox-Stop-Bridge.command`
 
 This command:
 

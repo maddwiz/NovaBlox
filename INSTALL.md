@@ -11,6 +11,13 @@ npm start
 
 One-click setup auto-configures secure local bridge values, detects BYOK provider or local model mode, and syncs Studio plugin settings.
 
+macOS no-terminal launchers:
+
+- Double-click `NovaBlox-OneClick-Setup.command` (full setup + bridge start + doctor)
+- Double-click `NovaBlox-Stop-Bridge.command` (stop bridge)
+- Terminal aliases (same behavior): `npm run macos:oneclick` and `npm run macos:stop`
+- If macOS blocks launchers, right-click -> `Open` -> `Open`
+
 macOS arm64 one-command bootstrap:
 
 ```bash

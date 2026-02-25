@@ -7,6 +7,10 @@ npm run setup:oneclick
 npm start
 ```
 
+macOS no-terminal path:
+
+- Double-click `NovaBlox-OneClick-Setup.command` from Finder (does setup + starts bridge + runs doctor).
+
 Then:
 
 1. Install `plugin/RobloxStudioBridge.lua` as a local plugin in Studio.

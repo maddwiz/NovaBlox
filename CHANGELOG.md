@@ -35,6 +35,11 @@ All notable changes to NovaBlox are documented in this file.
   - `npm run format:check`
   - `npm run showcase:ultimate`
   - `npm run setup:oneclick`
+  - `npm run macos:oneclick`
+  - `npm run macos:stop`
+- macOS double-click launchers in repo root:
+  - `NovaBlox-OneClick-Setup.command`
+  - `NovaBlox-Stop-Bridge.command`
 
 ### Changed
 
