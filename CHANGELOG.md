@@ -54,6 +54,7 @@ All notable changes to NovaBlox are documented in this file.
 - macOS one-click launcher now copies API key to clipboard and opens Studio UI first (`/bridge/studio`).
 - Studio web UI now auto-loads API key from one-click launcher URL fragment and persists it in browser storage.
 - Improved Studio UI readability for checkbox/wizard status text in narrow layouts.
+- Studio voice input now force-stops mic on transcript, timeout, tab hide, and page unload.
 
 ## [1.1.0] - 2026-02-25
 

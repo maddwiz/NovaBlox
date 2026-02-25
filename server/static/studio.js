@@ -1,6 +1,7 @@
 "use strict";
 
 const API_KEY_STORAGE_KEY = "novablox_studio_api_key";
+const MAX_VOICE_LISTEN_MS = 8000;
 
 const el = {
   apiKey: document.getElementById("apiKey"),
@@ -23,6 +24,7 @@ const state = {
   plan: null,
   listening: false,
   recognition: null,
+  voiceTimer: null,
 };
 
 function log(message, isError = false) {
@@ -100,6 +102,35 @@ function initializeApiKey() {
   if (storedKey) {
     el.apiKey.value = storedKey;
   }
+}
+
+function setVoiceButtonIdle() {
+  el.voiceBtn.className = "btn-secondary";
+  el.voiceBtn.textContent = "Voice Input";
+}
+
+function clearVoiceTimer() {
+  if (state.voiceTimer) {
+    clearTimeout(state.voiceTimer);
+    state.voiceTimer = null;
+  }
+}
+
+function stopVoiceSession(reason = "") {
+  clearVoiceTimer();
+  if (state.recognition && state.listening) {
+    try {
+      if (reason === "timeout") {
+        state.recognition.abort();
+      } else {
+        state.recognition.stop();
+      }
+    } catch {
+      // Ignore browser-specific SpeechRecognition stop errors.
+    }
+  }
+  state.listening = false;
+  setVoiceButtonIdle();
 }
 
 async function fetchJson(path, options = {}) {
@@ -272,6 +303,11 @@ function setupVoice() {
     state.listening = true;
     el.voiceBtn.className = "btn-danger";
     el.voiceBtn.textContent = "Listening...";
+    clearVoiceTimer();
+    state.voiceTimer = setTimeout(() => {
+      stopVoiceSession("timeout");
+      log("voice input timed out, mic stopped");
+    }, MAX_VOICE_LISTEN_MS);
   };
 
   recognition.onresult = (event) => {
@@ -285,21 +321,21 @@ function setupVoice() {
       el.prompt.value = text;
       log(`voice captured: ${text}`);
     }
+    stopVoiceSession("captured");
   };
 
   recognition.onerror = (event) => {
     log(`voice error: ${event.error || "unknown"}`, true);
+    stopVoiceSession("error");
   };
 
   recognition.onend = () => {
-    state.listening = false;
-    el.voiceBtn.className = "btn-secondary";
-    el.voiceBtn.textContent = "Voice Input";
+    stopVoiceSession("ended");
   };
 
   el.voiceBtn.addEventListener("click", () => {
     if (state.listening) {
-      recognition.stop();
+      stopVoiceSession("manual");
     } else {
       recognition.start();
     }
@@ -324,3 +360,13 @@ initializeApiKey();
 setupVoice();
 loadTemplates();
 checkHealth();
+
+window.addEventListener("beforeunload", () => {
+  stopVoiceSession("unload");
+});
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) {
+    stopVoiceSession("hidden");
+  }
+});
