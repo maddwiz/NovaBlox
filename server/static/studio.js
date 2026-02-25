@@ -25,6 +25,9 @@ const state = {
   listening: false,
   recognition: null,
   voiceTimer: null,
+  voiceForceAbortTimer: null,
+  voiceStopRequested: false,
+  suppressAbortError: false,
 };
 
 function log(message, isError = false) {
@@ -116,20 +119,51 @@ function clearVoiceTimer() {
   }
 }
 
-function stopVoiceSession(reason = "") {
-  clearVoiceTimer();
-  if (state.recognition && state.listening) {
-    try {
-      if (reason === "timeout") {
-        state.recognition.abort();
-      } else {
-        state.recognition.stop();
-      }
-    } catch {
-      // Ignore browser-specific SpeechRecognition stop errors.
-    }
+function clearVoiceForceAbortTimer() {
+  if (state.voiceForceAbortTimer) {
+    clearTimeout(state.voiceForceAbortTimer);
+    state.voiceForceAbortTimer = null;
   }
+}
+
+function finalizeVoiceSession() {
+  clearVoiceTimer();
+  clearVoiceForceAbortTimer();
   state.listening = false;
+  state.voiceStopRequested = false;
+  state.suppressAbortError = false;
+  state.recognition = null;
+  setVoiceButtonIdle();
+}
+
+function stopVoiceSession(reason = "") {
+  if (!state.recognition) {
+    finalizeVoiceSession();
+    return;
+  }
+  if (!state.listening) {
+    setVoiceButtonIdle();
+    return;
+  }
+  clearVoiceTimer();
+  state.voiceStopRequested = true;
+  state.suppressAbortError = reason !== "error";
+  try {
+    state.recognition.stop();
+  } catch {
+    // Ignore browser-specific SpeechRecognition stop errors.
+  }
+  clearVoiceForceAbortTimer();
+  state.voiceForceAbortTimer = setTimeout(() => {
+    if (!state.listening || !state.recognition) {
+      return;
+    }
+    try {
+      state.recognition.abort();
+    } catch {
+      // Ignore browser-specific SpeechRecognition abort errors.
+    }
+  }, 1200);
   setVoiceButtonIdle();
 }
 
@@ -293,51 +327,71 @@ function setupVoice() {
     return;
   }
 
-  const recognition = new Speech();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = "en-US";
-  state.recognition = recognition;
+  function createRecognition() {
+    const recognition = new Speech();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
 
-  recognition.onstart = () => {
-    state.listening = true;
-    el.voiceBtn.className = "btn-danger";
-    el.voiceBtn.textContent = "Listening...";
-    clearVoiceTimer();
-    state.voiceTimer = setTimeout(() => {
-      stopVoiceSession("timeout");
-      log("voice input timed out, mic stopped");
-    }, MAX_VOICE_LISTEN_MS);
-  };
+    recognition.onstart = () => {
+      state.listening = true;
+      state.voiceStopRequested = false;
+      state.suppressAbortError = false;
+      el.voiceBtn.className = "btn-danger";
+      el.voiceBtn.textContent = "Listening...";
+      clearVoiceTimer();
+      state.voiceTimer = setTimeout(() => {
+        if (!state.listening) {
+          return;
+        }
+        log("voice input timed out, stopping mic");
+        stopVoiceSession("timeout");
+      }, MAX_VOICE_LISTEN_MS);
+    };
 
-  recognition.onresult = (event) => {
-    const text =
-      (event.results &&
-        event.results[0] &&
-        event.results[0][0] &&
-        event.results[0][0].transcript) ||
-      "";
-    if (text) {
-      el.prompt.value = text;
-      log(`voice captured: ${text}`);
-    }
-    stopVoiceSession("captured");
-  };
+    recognition.onresult = (event) => {
+      const text =
+        (event.results &&
+          event.results[0] &&
+          event.results[0][0] &&
+          event.results[0][0].transcript) ||
+        "";
+      if (text) {
+        el.prompt.value = text;
+        log(`voice captured: ${text}`);
+      }
+      stopVoiceSession("captured");
+    };
 
-  recognition.onerror = (event) => {
-    log(`voice error: ${event.error || "unknown"}`, true);
-    stopVoiceSession("error");
-  };
+    recognition.onerror = (event) => {
+      const errorCode = event.error || "unknown";
+      const isExpectedAbort =
+        errorCode === "aborted" &&
+        (state.suppressAbortError || state.voiceStopRequested);
+      if (!isExpectedAbort) {
+        log(`voice error: ${errorCode}`, true);
+      }
+      finalizeVoiceSession();
+    };
 
-  recognition.onend = () => {
-    stopVoiceSession("ended");
-  };
+    recognition.onend = () => {
+      finalizeVoiceSession();
+    };
+
+    return recognition;
+  }
 
   el.voiceBtn.addEventListener("click", () => {
     if (state.listening) {
       stopVoiceSession("manual");
     } else {
-      recognition.start();
+      state.recognition = createRecognition();
+      try {
+        state.recognition.start();
+      } catch (err) {
+        log(`voice start failed: ${err.message || err}`, true);
+        finalizeVoiceSession();
+      }
     }
   });
 }
