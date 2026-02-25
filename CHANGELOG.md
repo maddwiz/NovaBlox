@@ -40,6 +40,7 @@ All notable changes to NovaBlox are documented in this file.
 - macOS double-click launchers in repo root:
   - `NovaBlox-OneClick-Setup.command`
   - `NovaBlox-Stop-Bridge.command`
+- Beginner-first onboarding guide: `START_HERE.md`
 
 ### Changed
 
