@@ -27,7 +27,10 @@ const WORLD = {
 function req(method, route, payload) {
   return new Promise((resolve, reject) => {
     const body = payload ? JSON.stringify(payload) : null;
-    const headers = { "Content-Type": "application/json", "X-Client-Id": CLIENT_ID };
+    const headers = {
+      "Content-Type": "application/json",
+      "X-Client-Id": CLIENT_ID,
+    };
     if (API_KEY) {
       headers["X-API-Key"] = API_KEY;
     }
@@ -59,7 +62,7 @@ function req(method, route, payload) {
             resolve({ raw: data, statusCode: response.statusCode });
           }
         });
-      }
+      },
     );
     request.on("error", reject);
     request.on("timeout", () => {
@@ -152,7 +155,9 @@ function execute(command) {
     if (!target) {
       throw new Error(`target not found: ${targetName}`);
     }
-    const updated = upsertObject(target.name, { color: payload.color || target.color });
+    const updated = upsertObject(target.name, {
+      color: payload.color || target.color,
+    });
     return { updated };
   }
 
@@ -162,7 +167,9 @@ function execute(command) {
     if (!target) {
       throw new Error(`target not found: ${targetName}`);
     }
-    const updated = upsertObject(target.name, { size: payload.size || target.size });
+    const updated = upsertObject(target.name, {
+      size: payload.size || target.size,
+    });
     return { updated };
   }
 
@@ -172,7 +179,9 @@ function execute(command) {
     if (!target) {
       throw new Error(`target not found: ${targetName}`);
     }
-    const updated = upsertObject(target.name, { anchored: payload.anchored === true });
+    const updated = upsertObject(target.name, {
+      anchored: payload.anchored === true,
+    });
     return { updated };
   }
 
@@ -182,7 +191,9 @@ function execute(command) {
     if (!target) {
       throw new Error(`target not found: ${targetName}`);
     }
-    const updated = upsertObject(target.name, { can_collide: payload.can_collide !== false });
+    const updated = upsertObject(target.name, {
+      can_collide: payload.can_collide !== false,
+    });
     return { updated };
   }
 
@@ -192,7 +203,10 @@ function execute(command) {
       throw new Error("source target not found");
     }
     const cloneName = payload.new_name || `${source.name}_Copy`;
-    const created = upsertObject(cloneName, Object.assign({}, source, { name: cloneName }));
+    const created = upsertObject(
+      cloneName,
+      Object.assign({}, source, { name: cloneName }),
+    );
     return { clone: created };
   }
 
@@ -218,7 +232,12 @@ function execute(command) {
     return { from: source.name, to: newName };
   }
 
-  if (action === "generate-terrain" || action === "fill-region" || action === "replace-material" || action === "clear-region") {
+  if (
+    action === "generate-terrain" ||
+    action === "fill-region" ||
+    action === "replace-material" ||
+    action === "clear-region"
+  ) {
     WORLD.terrainOps.push({
       action,
       at: new Date().toISOString(),
@@ -227,12 +246,25 @@ function execute(command) {
     return { terrain_ops: WORLD.terrainOps.length };
   }
 
-  if (action === "set-lighting" || action === "set-atmosphere" || action === "set-skybox" || action === "set-time" || action === "set-fog") {
+  if (
+    action === "set-lighting" ||
+    action === "set-atmosphere" ||
+    action === "set-skybox" ||
+    action === "set-time" ||
+    action === "set-fog"
+  ) {
     Object.assign(WORLD.lighting, payload);
     return { lighting: WORLD.lighting };
   }
 
-  if (action === "insert-script" || action === "insert-local-script" || action === "insert-module-script" || action === "create-script" || action === "create-local-script" || action === "create-module-script") {
+  if (
+    action === "insert-script" ||
+    action === "insert-local-script" ||
+    action === "insert-module-script" ||
+    action === "create-script" ||
+    action === "create-local-script" ||
+    action === "create-module-script"
+  ) {
     const scriptRecord = {
       action,
       name: payload.name || "Script",
@@ -254,7 +286,10 @@ function execute(command) {
       material: "Neon",
       properties: { billboard_text: payload.text || "NovaBlox Connected" },
     });
-    return { spawned: created.name, message: "NovaBlox test spawn complete (mock)" };
+    return {
+      spawned: created.name,
+      message: "NovaBlox test spawn complete (mock)",
+    };
   }
 
   if (action === "import-blender") {
@@ -268,47 +303,99 @@ function execute(command) {
     };
   }
 
-  if (action === "playtest-start" || action === "playtest-stop" || action === "set-camera" || action === "focus-selection" || action === "screenshot" || action === "render-frame" || action === "publish-place" || action === "save-place" || action === "export-place" || action === "autosave" || action === "import-model" || action === "import-from-url" || action === "import") {
+  if (
+    action === "playtest-start" ||
+    action === "playtest-stop" ||
+    action === "set-camera" ||
+    action === "focus-selection" ||
+    action === "screenshot" ||
+    action === "render-frame" ||
+    action === "publish-place" ||
+    action === "save-place" ||
+    action === "export-place" ||
+    action === "autosave" ||
+    action === "import-model" ||
+    action === "import-from-url" ||
+    action === "import"
+  ) {
     return { accepted: true, action };
   }
 
-  return { accepted: false, action, message: "No mock behavior implemented; acknowledged." };
+  return {
+    accepted: false,
+    action,
+    message: "No mock behavior implemented; acknowledged.",
+  };
 }
 
-async function report(commandId, ok, result, error) {
-  await req("POST", "/bridge/results", {
+function makeResult(commandId, dispatchToken, ok, result, error) {
+  return {
     command_id: commandId,
+    dispatch_token: dispatchToken || null,
     ok,
     status: ok ? "ok" : "error",
     result: result || null,
     error: error || null,
     client_id: CLIENT_ID,
     mock: true,
-  });
+  };
+}
+
+async function reportBatch(results) {
+  if (!Array.isArray(results) || results.length === 0) {
+    return;
+  }
+  const payload = { results, client_id: CLIENT_ID, mock: true };
+  const response = await req("POST", "/bridge/results/batch", payload);
+  if (response && (response.status === "ok" || response.status === "partial")) {
+    return;
+  }
+  for (const item of results) {
+    await req("POST", "/bridge/results", item);
+  }
 }
 
 async function pollOnce() {
-  const data = await req("GET", `/bridge/commands?client_id=${encodeURIComponent(CLIENT_ID)}&limit=20`);
+  const data = await req(
+    "GET",
+    `/bridge/commands?client_id=${encodeURIComponent(CLIENT_ID)}&limit=20`,
+  );
   const commands = Array.isArray(data.commands) ? data.commands : [];
   if (commands.length === 0) {
     return 0;
   }
+  const results = [];
   for (const command of commands) {
     try {
       const result = execute(command);
-      await report(command.id, true, result, null);
+      results.push(
+        makeResult(command.id, command.dispatch_token, true, result, null),
+      );
       process.stdout.write(`[mock] ok ${command.id} ${command.action}\n`);
     } catch (err) {
-      await report(command.id, false, null, err.message);
-      process.stdout.write(`[mock] err ${command.id} ${command.action}: ${err.message}\n`);
+      results.push(
+        makeResult(
+          command.id,
+          command.dispatch_token,
+          false,
+          null,
+          err.message,
+        ),
+      );
+      process.stdout.write(
+        `[mock] err ${command.id} ${command.action}: ${err.message}\n`,
+      );
     }
   }
+  await reportBatch(results);
   return commands.length;
 }
 
 async function main() {
   const startedAt = Date.now();
-  process.stdout.write(`[mock] starting client=${CLIENT_ID} bridge=${BRIDGE_HOST}:${BRIDGE_PORT}\n`);
+  process.stdout.write(
+    `[mock] starting client=${CLIENT_ID} bridge=${BRIDGE_HOST}:${BRIDGE_PORT}\n`,
+  );
   for (;;) {
     try {
       await pollOnce();
@@ -320,7 +407,9 @@ async function main() {
     }
     await new Promise((resolve) => setTimeout(resolve, Math.max(100, POLL_MS)));
   }
-  process.stdout.write(`[mock] exiting objects=${WORLD.objects.size} scripts=${WORLD.scripts.length} terrain_ops=${WORLD.terrainOps.length}\n`);
+  process.stdout.write(
+    `[mock] exiting objects=${WORLD.objects.size} scripts=${WORLD.scripts.length} terrain_ops=${WORLD.terrainOps.length}\n`,
+  );
 }
 
 main().catch((err) => {

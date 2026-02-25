@@ -9,5 +9,5 @@ if [[ ! -d node_modules ]]; then
   npm install
 fi
 
-echo "[NovaBlox] Starting bridge server on http://localhost:30010"
+echo "[NovaBlox] Starting bridge server (URL from .env or defaults)..."
 npm start

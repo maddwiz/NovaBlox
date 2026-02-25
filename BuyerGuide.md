@@ -1,5 +1,13 @@
 # NovaBlox Buyer Guide
 
+## Important Platform Limits (Read First)
+
+- Roblox Studio plugin APIs are inconsistent across builds for local `OBJ/FBX` file import and screenshot capture.
+- NovaBlox keeps these routes available, but some workflows require manual Studio import UI or an external capture helper.
+- Recommended commercial flow:
+  1. Use `asset_id` insertion path for stable automated model insert + scale fix.
+  2. Treat direct local file import and screenshot capture as best-effort capabilities.
+
 ## Install
 
 1. Run the bridge server (`node server/index.js`).
@@ -43,6 +51,11 @@
 ## OpenClaw
 
 Use `extensions/openclaw/roblox-bridge`.
+
+## API + Studio UI
+
+- Browse API in a web UI: `http://127.0.0.1:30010/docs`
+- Use planner Studio UI (text + voice): `http://127.0.0.1:30010/bridge/studio`
 
 ## Security
 

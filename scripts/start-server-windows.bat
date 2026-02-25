@@ -12,5 +12,5 @@ if not exist node_modules (
   )
 )
 
-echo [NovaBlox] Starting bridge server on http://localhost:30010
+echo [NovaBlox] Starting bridge server (URL from .env or defaults)...
 call npm start

@@ -84,16 +84,26 @@ class NovaBlox:
         payload: Optional[Dict[str, Any]] = None,
         category: str = "custom",
         priority: int = 0,
+        idempotency_key: Optional[str] = None,
+        expires_in_ms: Optional[int] = None,
+        expires_at: Optional[str] = None,
     ) -> Dict[str, Any]:
+        body: Dict[str, Any] = {
+            "route": route,
+            "action": action,
+            "category": category,
+            "priority": priority,
+            "payload": payload or {},
+        }
+        if idempotency_key:
+            body["idempotency_key"] = idempotency_key
+        if expires_in_ms is not None:
+            body["expires_in_ms"] = int(expires_in_ms)
+        if expires_at:
+            body["expires_at"] = expires_at
         return self._post(
             "/command",
-            {
-                "route": route,
-                "action": action,
-                "category": category,
-                "priority": priority,
-                "payload": payload or {},
-            },
+            body,
         )
 
     def spawn_part(
@@ -272,15 +282,22 @@ class NovaBlox:
         result: Optional[Dict[str, Any]] = None,
         error: Optional[str] = None,
         requeue: bool = False,
+        dispatch_token: Optional[str] = None,
+        execution_ms: Optional[float] = None,
     ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "command_id": command_id,
+            "ok": bool(ok),
+            "status": "ok" if ok else "error",
+            "result": result,
+            "error": error,
+            "requeue": requeue,
+        }
+        if dispatch_token:
+            payload["dispatch_token"] = dispatch_token
+        if execution_ms is not None:
+            payload["execution_ms"] = float(execution_ms)
         return self._post(
             "/results",
-            {
-                "command_id": command_id,
-                "ok": bool(ok),
-                "status": "ok" if ok else "error",
-                "result": result,
-                "error": error,
-                "requeue": requeue,
-            },
+            payload,
         )

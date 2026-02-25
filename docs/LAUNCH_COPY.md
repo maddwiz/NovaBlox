@@ -14,26 +14,29 @@ Release: https://github.com/maddwiz/NovaBlox/releases/tag/v1.0.1
 ## X Thread Outline
 
 1. Problem:
-Roblox automation has been fragmented. Most tools stop at assets, not full Studio control.
+   Roblox automation has been fragmented. Most tools stop at assets, not full Studio control.
 
 2. What NovaBlox does:
+
 - AI -> HTTP bridge -> queued commands -> Studio plugin executor
 - Polling + SSE-triggered fetch
 - Result acknowledgements and command state tracking
 
 3. What you can automate:
+
 - Scene creation and transforms
 - Terrain/env lighting updates
 - Script insertion
 - Save/publish flows
 
 4. Integrations:
+
 - OpenClaw extension
 - Python SDK
 - MCP server
 
 5. CTA:
-Try `v1.0.1`, run the quick start, and share your first autonomous Roblox build.
+   Try `v1.0.1`, run the quick start, and share your first autonomous Roblox build.
 
 ## Reddit (r/robloxgamedev) Draft
 
@@ -44,6 +47,7 @@ Body:
 I just released NovaBlox, a Roblox Studio bridge for AI-driven workflows.
 
 What it includes:
+
 - Node bridge server with queued command model
 - Roblox Studio plugin executor
 - Scene/terrain/lighting/script/publish command routes
@@ -67,6 +71,7 @@ Core architecture:
 AI agent -> HTTP bridge -> command queue -> Studio plugin executor -> result ack
 
 Included:
+
 - 40+ command endpoints
 - OpenClaw extension
 - Python SDK

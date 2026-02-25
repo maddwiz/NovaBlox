@@ -1,13 +1,24 @@
-# NovaBlox API (v1.0.1)
+# NovaBlox API (v1.1.0)
 
-Base URL: `http://localhost:30010`  
-Auth: if `ROBLOXBRIDGE_API_KEY` is set, include header `X-API-Key: <key>`.
+Base URL: `http://127.0.0.1:30010`  
+Auth:
+
+- Legacy single-key mode: set `ROBLOXBRIDGE_API_KEY`, then include `X-API-Key: <key>`.
+- Scoped-key mode: set `ROBLOXBRIDGE_API_KEYS` as `key:role,key:role` with roles `read|write|admin`.
+- Rate limit: controlled by `ROBLOXBRIDGE_RATE_LIMIT_WINDOW_MS` + `ROBLOXBRIDGE_RATE_LIMIT_MAX`.
+- If auth is disabled, remote IPs are blocked by default unless `ROBLOXBRIDGE_ALLOW_UNAUTHENTICATED_REMOTE=true` (unsafe).
+- `X-Forwarded-For` is ignored unless `ROBLOXBRIDGE_TRUST_PROXY=true`.
 
 ## Quick conventions
 
 - Most `POST /bridge/...` command routes return a queued command object.
 - Roblox Studio plugin pulls queued commands from `GET /bridge/commands`.
-- Plugin reports completion to `POST /bridge/results`.
+- Plugin reports completion to `POST /bridge/results/batch` (or `POST /bridge/results` fallback).
+- `X-Idempotency-Key` (or `idempotency_key`) prevents duplicate queue entries on retries.
+- `expires_in_ms` / `expires_at` can be included when queueing commands to drop stale work.
+- Queue snapshots persist to `~/.novablox/queue-snapshot.json` by default (unless disabled).
+- Browser docs explorer: `GET /docs`
+- Browser planner UI: `GET /bridge/studio`
 - Queue response shape is consistent across command endpoints:
 
 ```json
@@ -17,7 +28,10 @@ Auth: if `ROBLOXBRIDGE_API_KEY` is set, include header `X-API-Key: <key>`.
   "category": "scene",
   "action": "spawn-object",
   "route": "/bridge/scene/spawn-object",
-  "queued_at": "2026-02-20T00:00:00.000Z"
+  "queued_at": "2026-02-20T00:00:00.000Z",
+  "deduped": false,
+  "idempotency_key": "agent-run-123-step-4",
+  "expires_at": "2026-02-20T00:05:00.000Z"
 }
 ```
 
@@ -34,10 +48,81 @@ curl -s http://localhost:30010/bridge/health | jq .
   "status": "ok",
   "product": "NovaBlox",
   "service": "RobloxStudioBridge",
-  "version": "1.0.1",
-  "queue": { "total_commands": 0, "pending_count": 0 }
+  "version": "1.1.0",
+  "queue": { "total_commands": 0, "pending_count": 0 },
+  "security": {
+    "bind_host": "127.0.0.1",
+    "binds_local_only": true,
+    "trust_proxy": false,
+    "allow_unauthenticated_remote": false,
+    "unauthenticated_remote_blocked": false
+  }
 }
 ```
+
+### `GET /bridge/capabilities`
+
+Returns runtime capability flags including persistence mode, auth/rate-limit state, import/capture constraints, and batch-result support.
+
+```bash
+curl -s http://127.0.0.1:30010/bridge/capabilities | jq .
+```
+
+### `GET /docs`
+
+Browsable API explorer page.
+
+```bash
+open http://127.0.0.1:30010/docs
+```
+
+### `GET /bridge/studio`
+
+Browser-based NovaBlox Studio UI (text + voice planning).
+
+```bash
+open http://127.0.0.1:30010/bridge/studio
+```
+
+### `GET /bridge/planner/templates`
+
+List deterministic planner templates.
+
+```bash
+curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:30010/bridge/planner/templates | jq .
+```
+
+### `GET /bridge/planner/catalog`
+
+List planner command catalog with risk levels.
+
+```bash
+curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:30010/bridge/planner/catalog | jq .
+```
+
+### `POST /bridge/assistant/plan`
+
+Generate deterministic plan from prompt/template.
+
+```bash
+curl -s -X POST http://127.0.0.1:30010/bridge/assistant/plan \
+  -H "X-API-Key: $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"build a 10 platform obby","template":"obstacle_course_builder"}' | jq .
+```
+
+### `POST /bridge/assistant/execute`
+
+Queue commands from a generated (or supplied) plan.
+
+```bash
+curl -s -X POST http://127.0.0.1:30010/bridge/assistant/execute \
+  -H "X-API-Key: $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"prompt":"terrain generator with sunset mood","template":"terrain_generator"}' | jq .
+```
+
+If dangerous commands are present, set `allow_dangerous=true`.
 
 ### `GET /bridge/stats`
 
@@ -100,7 +185,9 @@ curl -s 'http://localhost:30010/bridge/commands?client_id=studio-abc&limit=20' |
       "id": "UUID",
       "category": "scene",
       "action": "spawn-object",
-      "payload": { "name": "CmdPart" }
+      "payload": { "name": "CmdPart" },
+      "dispatch_token": "UUID",
+      "expires_at": "2026-02-20T00:05:00.000Z"
     }
   ]
 }
@@ -108,16 +195,47 @@ curl -s 'http://localhost:30010/bridge/commands?client_id=studio-abc&limit=20' |
 
 ### `POST /bridge/results`
 
+Use the `dispatch_token` returned by `GET /bridge/commands`; stale or missing tokens are rejected.
+
 ```bash
 curl -s -X POST http://localhost:30010/bridge/results \
   -H 'Content-Type: application/json' \
   -d '{
     "command_id":"UUID",
+    "dispatch_token":"UUID",
     "ok":true,
     "status":"ok",
+    "execution_ms":14.2,
     "result":{"path":"Workspace.CmdPart"},
     "error":null
   }' | jq .
+```
+
+### `POST /bridge/results/batch`
+
+Batch result report endpoint to reduce HTTP round trips.
+
+```bash
+curl -s -X POST http://127.0.0.1:30010/bridge/results/batch \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "results":[
+      {"command_id":"UUID-1","dispatch_token":"UUID-T1","ok":true,"status":"ok","execution_ms":7.2,"result":{"ok":true}},
+      {"command_id":"UUID-2","dispatch_token":"UUID-T2","ok":false,"status":"error","error":"target not found"}
+    ]
+  }' | jq .
+```
+
+Example response:
+
+```json
+{
+  "status": "partial",
+  "total_count": 2,
+  "success_count": 1,
+  "error_count": 1,
+  "duplicate_count": 0
+}
 ```
 
 ### `GET /bridge/commands/recent`
