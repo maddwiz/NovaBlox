@@ -55,6 +55,7 @@ All notable changes to NovaBlox are documented in this file.
 - Studio web UI now auto-loads API key from one-click launcher URL fragment and persists it in browser storage.
 - Improved Studio UI readability for checkbox/wizard status text in narrow layouts.
 - Studio voice input now force-stops mic on transcript, timeout, tab hide, and page unload.
+- Chrome/WebKit voice flow now uses aggressive abort + force-finalize to avoid stuck mic sessions.
 
 ## [1.1.0] - 2026-02-25
 

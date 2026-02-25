@@ -26,6 +26,7 @@ const state = {
   recognition: null,
   voiceTimer: null,
   voiceForceAbortTimer: null,
+  voiceForceFinalizeTimer: null,
   voiceStopRequested: false,
   suppressAbortError: false,
 };
@@ -126,9 +127,17 @@ function clearVoiceForceAbortTimer() {
   }
 }
 
+function clearVoiceForceFinalizeTimer() {
+  if (state.voiceForceFinalizeTimer) {
+    clearTimeout(state.voiceForceFinalizeTimer);
+    state.voiceForceFinalizeTimer = null;
+  }
+}
+
 function finalizeVoiceSession() {
   clearVoiceTimer();
   clearVoiceForceAbortTimer();
+  clearVoiceForceFinalizeTimer();
   state.listening = false;
   state.voiceStopRequested = false;
   state.suppressAbortError = false;
@@ -141,21 +150,23 @@ function stopVoiceSession(reason = "") {
     finalizeVoiceSession();
     return;
   }
-  if (!state.listening) {
-    setVoiceButtonIdle();
-    return;
-  }
+
   clearVoiceTimer();
   state.voiceStopRequested = true;
   state.suppressAbortError = reason !== "error";
   try {
-    state.recognition.stop();
+    // abort() releases mic capture faster in WebKit than stop().
+    state.recognition.abort();
   } catch {
-    // Ignore browser-specific SpeechRecognition stop errors.
+    try {
+      state.recognition.stop();
+    } catch {
+      // Ignore browser-specific SpeechRecognition stop errors.
+    }
   }
   clearVoiceForceAbortTimer();
   state.voiceForceAbortTimer = setTimeout(() => {
-    if (!state.listening || !state.recognition) {
+    if (!state.recognition) {
       return;
     }
     try {
@@ -163,7 +174,11 @@ function stopVoiceSession(reason = "") {
     } catch {
       // Ignore browser-specific SpeechRecognition abort errors.
     }
-  }, 1200);
+  }, 200);
+  clearVoiceForceFinalizeTimer();
+  state.voiceForceFinalizeTimer = setTimeout(() => {
+    finalizeVoiceSession();
+  }, 2500);
   setVoiceButtonIdle();
 }
 
@@ -334,6 +349,14 @@ function setupVoice() {
     recognition.lang = "en-US";
 
     recognition.onstart = () => {
+      if (state.voiceStopRequested) {
+        try {
+          recognition.abort();
+        } catch {
+          // Ignore browser-specific SpeechRecognition abort errors.
+        }
+        return;
+      }
       state.listening = true;
       state.voiceStopRequested = false;
       state.suppressAbortError = false;
