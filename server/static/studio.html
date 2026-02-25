@@ -4,16 +4,52 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>NovaBlox Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+    rel="stylesheet"
+  />
   <link rel="stylesheet" href="/bridge/static/studio.css" />
 </head>
 <body>
   <main class="shell">
     <section class="hero">
-      <h1>NovaBlox Studio</h1>
-      <p>
-        Text + voice planner for Roblox scene automation. Generate a plan,
-        inspect risk, then queue commands to the bridge with one click.
-      </p>
+      <div class="hero-header">
+        <div class="hero-copy">
+          <p class="hero-kicker">NovaAI Theme</p>
+          <h1>NovaBlox Studio</h1>
+          <p>
+            Text + voice planner for Roblox scene automation. Generate a plan,
+            inspect risk, then queue commands with one click.
+          </p>
+        </div>
+        <img
+          class="hero-logo-mark"
+          src="/bridge/static/novaai-logo.svg"
+          alt="NovaAI logo mark"
+          loading="lazy"
+        />
+      </div>
+
+      <div class="hero-gallery">
+        <figure class="hero-card hero-card-logo">
+          <img
+            src="/bridge/static/novaai-logo.svg"
+            alt="NovaAI logo reference"
+            loading="lazy"
+          />
+          <figcaption>NovaAI logo</figcaption>
+        </figure>
+        <figure class="hero-card hero-card-energy">
+          <img
+            src="/bridge/static/novaai-energy.svg"
+            alt="NovaAI energy reference"
+            loading="lazy"
+          />
+          <figcaption>Theme color reference</figcaption>
+        </figure>
+      </div>
     </section>
 
     <section class="grid">
@@ -33,7 +69,7 @@
           </button>
         </div>
 
-        <div class="row" style="grid-template-columns: 1fr 200px;">
+        <div class="row row-split">
           <div>
             <label for="prompt">Describe What To Build</label>
             <textarea
@@ -52,7 +88,7 @@
           </div>
         </div>
 
-        <div class="button-row" style="margin-bottom: 8px;">
+        <div class="button-row button-row-main">
           <button id="voiceBtn" class="btn-secondary" type="button">
             Voice Input
           </button>
@@ -71,7 +107,7 @@
           </label>
         </div>
 
-        <div id="riskRow" class="button-row" style="margin-top: 10px;"></div>
+        <div id="riskRow" class="button-row risk-row"></div>
 
         <div class="template-grid" id="templateCards"></div>
         <div class="subtle">
