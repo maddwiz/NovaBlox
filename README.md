@@ -108,7 +108,7 @@ This writes `novablox_bridgeHost` and `novablox_apiKey` directly into Roblox plu
 npm run setup:oneclick
 ```
 
-macOS Finder launcher (same setup + starts bridge + copies API key + opens Studio UI):
+macOS Finder launcher (same setup + starts bridge + auto-fills API key in Studio UI + opens Studio UI):
 
 - `NovaBlox-OneClick-Setup.command`
 - stop later with `NovaBlox-Stop-Bridge.command`

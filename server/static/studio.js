@@ -1,5 +1,7 @@
 "use strict";
 
+const API_KEY_STORAGE_KEY = "novablox_studio_api_key";
+
 const el = {
   apiKey: document.getElementById("apiKey"),
   healthBtn: document.getElementById("healthBtn"),
@@ -37,6 +39,67 @@ function headers() {
     out["X-API-Key"] = key;
   }
   return out;
+}
+
+function parseApiKeyFromHash() {
+  const hash = window.location.hash || "";
+  const normalized = hash.startsWith("#") ? hash.slice(1) : hash;
+  if (!normalized) {
+    return "";
+  }
+  const params = new URLSearchParams(normalized);
+  return (
+    params.get("api_key") ||
+    params.get("novablox_api_key") ||
+    params.get("key") ||
+    ""
+  ).trim();
+}
+
+function saveApiKey(key) {
+  try {
+    const value = (key || "").trim();
+    if (!value) {
+      localStorage.removeItem(API_KEY_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(API_KEY_STORAGE_KEY, value);
+  } catch {
+    // localStorage may be unavailable in restricted browser contexts.
+  }
+}
+
+function loadStoredApiKey() {
+  try {
+    return (localStorage.getItem(API_KEY_STORAGE_KEY) || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+function initializeApiKey() {
+  const hashKey = parseApiKeyFromHash();
+  if (hashKey) {
+    el.apiKey.value = hashKey;
+    saveApiKey(hashKey);
+    // Remove key fragment from URL so it doesn't linger in history.
+    try {
+      window.history.replaceState(
+        null,
+        "",
+        window.location.pathname + window.location.search,
+      );
+    } catch {
+      // Ignore history API failures.
+    }
+    log("API key auto-filled from one-click setup.");
+    return;
+  }
+
+  const storedKey = loadStoredApiKey();
+  if (storedKey) {
+    el.apiKey.value = storedKey;
+  }
 }
 
 async function fetchJson(path, options = {}) {
@@ -249,8 +312,15 @@ el.template.addEventListener("change", () =>
 el.healthBtn.addEventListener("click", checkHealth);
 el.planBtn.addEventListener("click", generatePlan);
 el.queueBtn.addEventListener("click", queuePlan);
-el.apiKey.addEventListener("change", loadTemplates);
+el.apiKey.addEventListener("input", () => {
+  saveApiKey(el.apiKey.value);
+});
+el.apiKey.addEventListener("change", () => {
+  saveApiKey(el.apiKey.value);
+  loadTemplates();
+});
 
+initializeApiKey();
 setupVoice();
 loadTemplates();
 checkHealth();

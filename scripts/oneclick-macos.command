@@ -23,6 +23,24 @@ pause_if_tty() {
   fi
 }
 
+urlencode() {
+  local raw="${1:-}"
+  local length="${#raw}"
+  local encoded=""
+  local char hex
+  for ((i = 0; i < length; i++)); do
+    char="${raw:i:1}"
+    case "${char}" in
+      [a-zA-Z0-9.~_-]) encoded+="${char}" ;;
+      *)
+        printf -v hex '%%%02X' "'${char}"
+        encoded+="${hex}"
+        ;;
+    esac
+  done
+  printf "%s" "${encoded}"
+}
+
 print_step "One-click setup starting"
 cd "${ROOT_DIR}"
 
@@ -75,7 +93,12 @@ else
 fi
 
 print_step "Opening NovaBlox Studio UI"
-open "http://${HOST}:${PORT}/bridge/studio" || true
+STUDIO_URL="http://${HOST}:${PORT}/bridge/studio"
+if [[ -n "${API_KEY}" ]]; then
+  ENCODED_API_KEY="$(urlencode "${API_KEY}")"
+  STUDIO_URL="${STUDIO_URL}#api_key=${ENCODED_API_KEY}"
+fi
+open "${STUDIO_URL}" || true
 
 if [[ -d "${HOME}/Documents/Roblox/Plugins" ]]; then
   open "${HOME}/Documents/Roblox/Plugins" || true
@@ -88,7 +111,7 @@ cat <<MSG
 2) Open Plugins > NovaBlox > Panel
 3) Click Health, then Enable
 4) Use Build Demo / AI prompts
-5) API key is in clipboard if you need to paste it
+5) Web UI API key should auto-fill (clipboard backup is ready)
 
 To stop bridge later: double-click scripts/stop-bridge-macos.command
 or use repo root launcher: NovaBlox-Stop-Bridge.command
