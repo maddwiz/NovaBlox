@@ -93,14 +93,12 @@ body::before {
   border-radius: 22px;
   padding: 20px;
   border: 1px solid var(--line-strong);
-  background:
-    linear-gradient(
-      130deg,
-      rgba(23, 15, 57, 0.9),
-      rgba(10, 9, 29, 0.9) 52%,
-      rgba(38, 8, 44, 0.88)
-    ),
-    url("/bridge/static/novaai-energy.svg") center / cover no-repeat;
+  background: linear-gradient(
+    130deg,
+    rgba(23, 15, 57, 0.9),
+    rgba(10, 9, 29, 0.9) 52%,
+    rgba(38, 8, 44, 0.88)
+  );
   box-shadow: var(--shadow);
   position: relative;
   overflow: hidden;
@@ -129,7 +127,7 @@ body::before {
   grid-template-columns: minmax(0, 1.1fr) minmax(160px, 240px);
   gap: 18px;
   align-items: center;
-  margin-bottom: 14px;
+  margin-bottom: 0;
 }
 
 .hero-copy {
@@ -164,7 +162,7 @@ body::before {
 
 .hero-logo-mark {
   width: 100%;
-  max-width: 220px;
+  max-width: 190px;
   border-radius: 20px;
   border: 1px solid rgba(255, 116, 219, 0.56);
   box-shadow:
@@ -188,42 +186,6 @@ body::before {
       0 0 42px rgba(88, 225, 255, 0.34),
       0 0 58px rgba(255, 91, 201, 0.36);
   }
-}
-
-.hero-gallery {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.2fr);
-  gap: 10px;
-}
-
-.hero-card {
-  margin: 0;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(175, 141, 255, 0.45);
-  background: rgba(7, 6, 20, 0.82);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
-}
-
-.hero-card img {
-  width: 100%;
-  display: block;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-}
-
-.hero-card-logo img {
-  object-position: center;
-}
-
-.hero-card figcaption {
-  margin: 0;
-  padding: 8px 10px;
-  font-size: 0.74rem;
-  color: #ded8ff;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  border-top: 1px solid rgba(177, 166, 255, 0.22);
 }
 
 .grid {
@@ -581,10 +543,6 @@ button:active {
   .hero-logo-mark {
     justify-self: start;
     max-width: 180px;
-  }
-
-  .hero-gallery {
-    grid-template-columns: 1fr;
   }
 
   .grid {
