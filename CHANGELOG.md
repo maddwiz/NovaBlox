@@ -56,6 +56,7 @@ All notable changes to NovaBlox are documented in this file.
 - Improved Studio UI readability for checkbox/wizard status text in narrow layouts.
 - Studio voice input now force-stops mic on transcript, timeout, tab hide, and page unload.
 - Chrome/WebKit voice flow now uses aggressive abort + force-finalize to avoid stuck mic sessions.
+- Safari voice flow now retries abort pulses and uses longer force-finalize timing for better mic teardown.
 
 ## [1.1.0] - 2026-02-25
 

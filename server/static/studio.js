@@ -1,7 +1,14 @@
 "use strict";
 
 const API_KEY_STORAGE_KEY = "novablox_studio_api_key";
-const MAX_VOICE_LISTEN_MS = 8000;
+const USER_AGENT = navigator.userAgent || "";
+const IS_SAFARI =
+  /Safari/i.test(USER_AGENT) &&
+  !/Chrome|CriOS|Edg|OPR|Firefox|FxiOS|SamsungBrowser/i.test(USER_AGENT);
+const MAX_VOICE_LISTEN_MS = IS_SAFARI ? 5500 : 8000;
+const VOICE_ABORT_RETRY_MS = IS_SAFARI ? 120 : 220;
+const VOICE_ABORT_RETRY_LIMIT = IS_SAFARI ? 30 : 10;
+const VOICE_FORCE_FINALIZE_MS = IS_SAFARI ? 4200 : 2500;
 
 const el = {
   apiKey: document.getElementById("apiKey"),
@@ -25,7 +32,8 @@ const state = {
   listening: false,
   recognition: null,
   voiceTimer: null,
-  voiceForceAbortTimer: null,
+  voiceAbortInterval: null,
+  voiceAbortAttempts: 0,
   voiceForceFinalizeTimer: null,
   voiceStopRequested: false,
   suppressAbortError: false,
@@ -120,11 +128,12 @@ function clearVoiceTimer() {
   }
 }
 
-function clearVoiceForceAbortTimer() {
-  if (state.voiceForceAbortTimer) {
-    clearTimeout(state.voiceForceAbortTimer);
-    state.voiceForceAbortTimer = null;
+function clearVoiceAbortInterval() {
+  if (state.voiceAbortInterval) {
+    clearInterval(state.voiceAbortInterval);
+    state.voiceAbortInterval = null;
   }
+  state.voiceAbortAttempts = 0;
 }
 
 function clearVoiceForceFinalizeTimer() {
@@ -136,13 +145,29 @@ function clearVoiceForceFinalizeTimer() {
 
 function finalizeVoiceSession() {
   clearVoiceTimer();
-  clearVoiceForceAbortTimer();
+  clearVoiceAbortInterval();
   clearVoiceForceFinalizeTimer();
   state.listening = false;
   state.voiceStopRequested = false;
   state.suppressAbortError = false;
   state.recognition = null;
   setVoiceButtonIdle();
+}
+
+function requestVoiceAbort() {
+  if (!state.recognition) {
+    return;
+  }
+  try {
+    state.recognition.abort();
+  } catch {
+    // Ignore browser-specific SpeechRecognition abort errors.
+  }
+  try {
+    state.recognition.stop();
+  } catch {
+    // Ignore browser-specific SpeechRecognition stop errors.
+  }
 }
 
 function stopVoiceSession(reason = "") {
@@ -154,31 +179,25 @@ function stopVoiceSession(reason = "") {
   clearVoiceTimer();
   state.voiceStopRequested = true;
   state.suppressAbortError = reason !== "error";
-  try {
-    // abort() releases mic capture faster in WebKit than stop().
-    state.recognition.abort();
-  } catch {
-    try {
-      state.recognition.stop();
-    } catch {
-      // Ignore browser-specific SpeechRecognition stop errors.
-    }
-  }
-  clearVoiceForceAbortTimer();
-  state.voiceForceAbortTimer = setTimeout(() => {
-    if (!state.recognition) {
+  requestVoiceAbort();
+
+  clearVoiceAbortInterval();
+  state.voiceAbortInterval = setInterval(() => {
+    if (!state.recognition || (!state.listening && !state.voiceStopRequested)) {
+      clearVoiceAbortInterval();
       return;
     }
-    try {
-      state.recognition.abort();
-    } catch {
-      // Ignore browser-specific SpeechRecognition abort errors.
+    state.voiceAbortAttempts += 1;
+    requestVoiceAbort();
+    if (state.voiceAbortAttempts >= VOICE_ABORT_RETRY_LIMIT) {
+      clearVoiceAbortInterval();
     }
-  }, 200);
+  }, VOICE_ABORT_RETRY_MS);
+
   clearVoiceForceFinalizeTimer();
   state.voiceForceFinalizeTimer = setTimeout(() => {
     finalizeVoiceSession();
-  }, 2500);
+  }, VOICE_FORCE_FINALIZE_MS);
   setVoiceButtonIdle();
 }
 
@@ -341,6 +360,10 @@ function setupVoice() {
     el.voiceBtn.title = "SpeechRecognition API unavailable in this browser";
     return;
   }
+  if (IS_SAFARI) {
+    el.voiceBtn.title =
+      "Safari voice is experimental. If mic stays on, stop and refresh.";
+  }
 
   function createRecognition() {
     const recognition = new Speech();
@@ -405,7 +428,7 @@ function setupVoice() {
   }
 
   el.voiceBtn.addEventListener("click", () => {
-    if (state.listening) {
+    if (state.listening || state.voiceStopRequested) {
       stopVoiceSession("manual");
     } else {
       state.recognition = createRecognition();
