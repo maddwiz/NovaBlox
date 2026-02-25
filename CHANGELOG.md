@@ -33,6 +33,7 @@ All notable changes to NovaBlox are documented in this file.
   - `npm run lint`
   - `npm run format`
   - `npm run format:check`
+  - `npm run showcase:ultimate`
 
 ### Changed
 

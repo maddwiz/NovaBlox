@@ -26,6 +26,7 @@ Version: `1.1.0`
 - Blender pipeline endpoint (`POST /bridge/asset/import-blender`) with scale-fix payload support
 - Instant connectivity endpoint (`POST /bridge/test-spawn`)
 - One-command showcase builder (`npm run showcase:run`)
+- One-command ultimate LLM demo runner (`npm run showcase:ultimate`)
 - OpenClaw extension (`extensions/openclaw/roblox-bridge`)
 - Python SDK (`python-sdk`)
 - MCP server (`mcp-server`)
@@ -110,6 +111,15 @@ npm run showcase:run
 ```
 
 Run this while Studio plugin is enabled to auto-build a polished demo map.
+
+### One-command ultimate LLM demo
+
+```bash
+npm run showcase:ultimate
+```
+
+This runs a curated 3-step OpenAI/OpenRouter/Anthropic-powered scene build workflow and waits for command completion.
+Set `ROBLOXBRIDGE_ASSISTANT_PROVIDER` and provider API key in `.env` first.
 
 ### Package beta release zip
 

@@ -30,7 +30,11 @@ Then:
    ```bash
    npm run showcase:run
    ```
-6. Open browser tools:
+6. Run the curated LLM “ultimate demo” flow (requires provider key in `.env`):
+   ```bash
+   npm run showcase:ultimate
+   ```
+7. Open browser tools:
    - API explorer: `http://127.0.0.1:30010/docs`
    - Studio planner UI (text + voice): `http://127.0.0.1:30010/bridge/studio`
 

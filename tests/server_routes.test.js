@@ -107,6 +107,10 @@ function startServer(port, envOverrides = {}) {
       ROBLOXBRIDGE_RATE_LIMIT_WINDOW_MS: "60000",
       ROBLOXBRIDGE_RATE_LIMIT_MAX: "1000",
       ROBLOXBRIDGE_RATE_LIMIT_EXEMPT_LOCAL: "false",
+      ROBLOXBRIDGE_ASSISTANT_PROVIDER: "deterministic",
+      OPENAI_API_KEY: "",
+      OPENROUTER_API_KEY: "",
+      ANTHROPIC_API_KEY: "",
     },
     envOverrides,
   );

@@ -6,7 +6,7 @@
   "main": "server/index.js",
   "scripts": {
     "start": "node server/index.js",
-    "check": "node --check server/index.js && node --check server/command_store.js && node --check server/rate_limiter.js && node --check server/command_catalog.js && node --check server/assistant_engine.js && node --check extensions/openclaw/roblox-bridge/index.js && node --check examples/mock/mock_studio_client.js && node --check scripts/run_showcase.js && node --check scripts/sync_studio_settings.js && node --check scripts/doctor.js",
+    "check": "node --check server/index.js && node --check server/command_store.js && node --check server/rate_limiter.js && node --check server/command_catalog.js && node --check server/assistant_engine.js && node --check extensions/openclaw/roblox-bridge/index.js && node --check examples/mock/mock_studio_client.js && node --check scripts/run_showcase.js && node --check scripts/run_ultimate_demo.js && node --check scripts/sync_studio_settings.js && node --check scripts/doctor.js",
     "lint": "npm run check && npm test",
     "format": "prettier --write \"README.md\" \"INSTALL.md\" \"QUICK_START.md\" \"BuyerGuide.md\" \"CHANGELOG.md\" \"docs/**/*.md\" \"server/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"extensions/**/*.js\" \"examples/**/*.js\" \"package.json\"",
     "format:check": "prettier --check \"README.md\" \"INSTALL.md\" \"QUICK_START.md\" \"BuyerGuide.md\" \"CHANGELOG.md\" \"docs/**/*.md\" \"server/**/*.js\" \"scripts/**/*.js\" \"tests/**/*.js\" \"extensions/**/*.js\" \"examples/**/*.js\" \"package.json\"",
@@ -16,6 +16,7 @@
     "studio:sync": "node scripts/sync_studio_settings.js",
     "doctor": "node scripts/doctor.js",
     "showcase:run": "node scripts/run_showcase.js",
+    "showcase:ultimate": "node scripts/run_ultimate_demo.js",
     "mock:studio": "node examples/mock/mock_studio_client.js"
   },
   "engines": {
