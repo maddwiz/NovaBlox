@@ -102,7 +102,8 @@ curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:30010/bridge/planner/catalog |
 
 ### `POST /bridge/assistant/plan`
 
-Generate deterministic plan from prompt/template.
+Generate plan from prompt/template. Default mode is deterministic templates.
+Set `use_llm=true` with `provider` (`openai|openrouter|anthropic`) to use external LLM planning.
 
 ```bash
 curl -s -X POST http://127.0.0.1:30010/bridge/assistant/plan \
@@ -123,6 +124,26 @@ curl -s -X POST http://127.0.0.1:30010/bridge/assistant/execute \
 ```
 
 If dangerous commands are present, set `allow_dangerous=true`.
+
+### `POST /bridge/introspection/scene`
+
+Queue a Studio-side scene snapshot action.
+
+```bash
+curl -s -X POST http://127.0.0.1:30010/bridge/introspection/scene \
+  -H "X-API-Key: $API_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{"max_objects":500}' | jq .
+```
+
+### `GET /bridge/introspection/scene`
+
+Read latest cached introspection result. Set `include_objects=false` for compact summary.
+
+```bash
+curl -s -H "X-API-Key: $API_KEY" \
+  'http://127.0.0.1:30010/bridge/introspection/scene?include_objects=false' | jq .
+```
 
 ### `GET /bridge/stats`
 

@@ -15,10 +15,18 @@ All notable changes to NovaBlox are documented in this file.
   - `GET /bridge/planner/catalog`
   - `POST /bridge/assistant/plan`
   - `POST /bridge/assistant/execute`
+- Scene introspection endpoints:
+  - `POST /bridge/introspection/scene` (queue)
+  - `GET /bridge/introspection/scene` (cached result)
+- External LLM planner providers with deterministic fallback:
+  - OpenAI
+  - OpenRouter
+  - Anthropic
 - NovaBlox Studio web UI at `GET /bridge/studio` with:
   - text + voice input
   - plan preview and risk badges
   - one-click queue execution
+- Studio UI refactor into static modules (`studio.html` + `studio.css` + `studio.js`).
 - Browsable API explorer site at `GET /docs`.
 - Endpoint metadata feed at `GET /bridge/docs/endpoints`.
 - Package workflows:
@@ -29,6 +37,9 @@ All notable changes to NovaBlox are documented in this file.
 ### Changed
 
 - Buyer-facing docs now call out OBJ/FBX import and screenshot limitations more prominently.
+- Setup docs now emphasize `npm run studio:sync` as the required host/API-key sync path.
+- MCP server + Python SDK now expose planner and scene introspection endpoints.
+- CI now runs lint/tests/format checks plus Python syntax verification.
 
 ## [1.1.0] - 2026-02-25
 

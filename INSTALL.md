@@ -35,6 +35,7 @@ Shortcuts:
 4. Save script as a Local Plugin.
 5. Restart Studio.
 6. Run `npm run studio:sync` in the repo terminal (auto-writes host/API key settings).
+   Re-run this command after any `.env` host/API key change.
 7. Re-open Studio, click `Plugins > NovaBlox > Panel`, then follow the First-Run Wizard (`Next Step`).
 
 ## 3. Test

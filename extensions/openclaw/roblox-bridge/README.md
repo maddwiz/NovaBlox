@@ -14,6 +14,8 @@ This extension now exposes near 1:1 coverage of NovaBlox route groups:
 - Blender asset route (`/bridge/asset/import-blender`)
 - Connectivity test (`/bridge/test-spawn`)
 - Queue control/status tools (`health`, `stats`, `recent`, `status`, `requeue`, `cancel`, `custom`)
+- Planner tools (`planner_templates`, `planner_catalog`, `assistant_plan`, `assistant_execute`)
+- Scene introspection tools (`scene_introspect`, `scene_introspection`)
 
 Every POST command tool accepts:
 

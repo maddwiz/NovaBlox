@@ -73,6 +73,119 @@ class NovaBlox:
     def stats(self) -> Dict[str, Any]:
         return self._get("/stats")
 
+    def planner_templates(self) -> Dict[str, Any]:
+        return self._get("/planner/templates")
+
+    def planner_catalog(self) -> Dict[str, Any]:
+        return self._get("/planner/catalog")
+
+    def plan(
+        self,
+        *,
+        prompt: str,
+        template: Optional[str] = None,
+        use_llm: bool = False,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        include_scene_context: bool = True,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "prompt": prompt,
+            "use_llm": bool(use_llm),
+            "include_scene_context": bool(include_scene_context),
+        }
+        if template:
+            payload["template"] = template
+        if provider:
+            payload["provider"] = provider
+        if model:
+            payload["model"] = model
+        if temperature is not None:
+            payload["temperature"] = float(temperature)
+        return self._post("/assistant/plan", payload)
+
+    def assistant_plan(
+        self,
+        *,
+        prompt: str,
+        template: Optional[str] = None,
+        use_llm: bool = False,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        include_scene_context: bool = True,
+    ) -> Dict[str, Any]:
+        return self.plan(
+            prompt=prompt,
+            template=template,
+            use_llm=use_llm,
+            provider=provider,
+            model=model,
+            temperature=temperature,
+            include_scene_context=include_scene_context,
+        )
+
+    def execute_plan(
+        self,
+        *,
+        plan: Optional[Dict[str, Any]] = None,
+        prompt: Optional[str] = None,
+        template: Optional[str] = None,
+        allow_dangerous: bool = False,
+        use_llm: bool = False,
+        provider: Optional[str] = None,
+        model: Optional[str] = None,
+        temperature: Optional[float] = None,
+        include_scene_context: bool = True,
+        expires_in_ms: Optional[int] = None,
+        idempotency_prefix: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "allow_dangerous": bool(allow_dangerous),
+            "use_llm": bool(use_llm),
+            "include_scene_context": bool(include_scene_context),
+        }
+        if plan is not None:
+            payload["plan"] = plan
+        if prompt:
+            payload["prompt"] = prompt
+        if template:
+            payload["template"] = template
+        if provider:
+            payload["provider"] = provider
+        if model:
+            payload["model"] = model
+        if temperature is not None:
+            payload["temperature"] = float(temperature)
+        if expires_in_ms is not None:
+            payload["expires_in_ms"] = int(expires_in_ms)
+        if idempotency_prefix:
+            payload["idempotency_prefix"] = idempotency_prefix
+        return self._post("/assistant/execute", payload)
+
+    def introspect_scene(
+        self,
+        *,
+        max_objects: int = 500,
+        include_selection: bool = True,
+        include_non_workspace: bool = False,
+    ) -> Dict[str, Any]:
+        return self._post(
+            "/introspection/scene",
+            {
+                "max_objects": int(max_objects),
+                "include_selection": bool(include_selection),
+                "include_non_workspace": bool(include_non_workspace),
+            },
+        )
+
+    def scene_introspection(self, *, include_objects: bool = False) -> Dict[str, Any]:
+        return self._get(
+            "/introspection/scene",
+            {"include_objects": "true" if include_objects else "false"},
+        )
+
     def command_status(self, command_id: str) -> Dict[str, Any]:
         return self._get(f"/commands/{urllib.parse.quote(command_id)}")
 

@@ -1,11 +1,11 @@
-name: Node Check
+name: CI
 
 on:
   push:
   pull_request:
 
 jobs:
-  check:
+  check-matrix:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -28,3 +28,43 @@ jobs:
 
       - name: Static checks
         run: npm run check
+
+  quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint and tests
+        run: npm run lint
+
+      - name: Formatting check
+        run: npm run format:check
+
+  python-bridge:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install MCP dependencies
+        run: pip install -r mcp-server/requirements.txt
+
+      - name: Python syntax check
+        run: python -m py_compile python-sdk/novablox.py mcp-server/novablox_mcp.py

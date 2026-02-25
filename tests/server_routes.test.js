@@ -341,8 +341,25 @@ test("planner endpoints and browser UIs are reachable", async () => {
     });
     assert.equal(plan.statusCode, 200);
     assert.ok(plan.body.plan);
+    assert.ok(plan.body.assistant);
     assert.ok(Array.isArray(plan.body.plan.commands));
     assert.ok(plan.body.plan.commands.length >= 8);
+
+    const llmFallback = await requestJson(
+      port,
+      "POST",
+      "/bridge/assistant/plan",
+      {
+        apiKey: READ_KEY,
+        body: {
+          prompt: "create a pirate ship with cannons",
+          use_llm: true,
+          provider: "openai",
+        },
+      },
+    );
+    assert.equal(llmFallback.statusCode, 200);
+    assert.equal(llmFallback.body.assistant.fallback, true);
 
     const execute = await requestJson(
       port,
@@ -399,6 +416,83 @@ test("planner endpoints and browser UIs are reachable", async () => {
     const studioPage = await requestJson(port, "GET", "/bridge/studio");
     assert.equal(studioPage.statusCode, 200);
     assert.match(studioPage.raw, /NovaBlox Studio/i);
+  } finally {
+    await server.stop();
+    assert.equal(server.child.exitCode, 0, server.getStderr());
+  }
+});
+
+test("scene introspection endpoint queues and caches latest snapshot", async () => {
+  const port = makePort(6);
+  const server = startServer(port);
+  try {
+    await waitForServer(port);
+
+    const queued = await requestJson(
+      port,
+      "POST",
+      "/bridge/introspection/scene",
+      {
+        apiKey: WRITE_KEY,
+        body: { max_objects: 64 },
+      },
+    );
+    assert.equal(queued.statusCode, 200);
+    assert.equal(queued.body.status, "queued");
+    assert.equal(queued.body.action, "introspect-scene");
+
+    const pulled = await requestJson(
+      port,
+      "GET",
+      "/bridge/commands?client_id=introspection-test&limit=1",
+      { apiKey: WRITE_KEY },
+    );
+    assert.equal(pulled.statusCode, 200);
+    assert.equal(pulled.body.count, 1);
+    const command = pulled.body.commands[0];
+    assert.equal(command.action, "introspect-scene");
+    assert.ok(command.dispatch_token);
+
+    const result = await requestJson(port, "POST", "/bridge/results", {
+      apiKey: WRITE_KEY,
+      body: {
+        command_id: command.id,
+        dispatch_token: command.dispatch_token,
+        ok: true,
+        status: "ok",
+        result: {
+          root: "Workspace",
+          object_count: 2,
+          max_objects: 64,
+          truncated: false,
+          collected_at: new Date().toISOString(),
+          class_counts: { Part: 2 },
+          materials: ["Concrete"],
+          selection: [],
+          objects: [
+            { name: "PartA", class_name: "Part", path: "Workspace.PartA" },
+            { name: "PartB", class_name: "Part", path: "Workspace.PartB" },
+          ],
+        },
+      },
+    });
+    assert.equal(result.statusCode, 200);
+    assert.equal(result.body.status, "ok");
+
+    const introspection = await requestJson(
+      port,
+      "GET",
+      "/bridge/introspection/scene?include_objects=false",
+      {
+        apiKey: READ_KEY,
+      },
+    );
+    assert.equal(introspection.statusCode, 200);
+    assert.equal(introspection.body.introspection.state, "succeeded");
+    assert.equal(introspection.body.introspection.scene.object_count, 2);
+    assert.ok(
+      Array.isArray(introspection.body.introspection.scene.sample_objects),
+    );
   } finally {
     await server.stop();
     assert.equal(server.child.exitCode, 0, server.getStderr());

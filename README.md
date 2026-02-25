@@ -17,7 +17,9 @@ Version: `1.1.0`
 - Queue snapshot persistence across restarts
 - Scoped API keys (`read`/`write`/`admin`) + built-in rate limiting
 - Deterministic AI planner engine + risk guardrails (`/bridge/assistant/plan`, `/bridge/assistant/execute`)
+- Optional LLM planning providers (OpenAI / OpenRouter / Anthropic) with deterministic fallback
 - Planner metadata endpoints (`/bridge/planner/templates`, `/bridge/planner/catalog`)
+- Scene introspection queue + cache endpoints (`POST/GET /bridge/introspection/scene`)
 - Browser Studio UI (`/bridge/studio`) with text + voice planning
 - Browsable API explorer (`/docs`)
 - 40+ command endpoints (scene, assets, terrain, lighting, scripts, viewport, publish/save)
@@ -50,6 +52,7 @@ Version: `1.1.0`
    ```bash
    npm run studio:sync
    ```
+   This sync step is required any time host/API key changes.
 7. Restart Roblox Studio, then open `Plugins > NovaBlox > Panel` and follow the **First-Run Wizard** (`Next Step`).
 8. Test from terminal:
    ```bash
@@ -137,6 +140,19 @@ See `.env.example`.
 - `ROBLOXBRIDGE_RATE_LIMIT_EXEMPT_LOCAL`
 - `ROBLOXBRIDGE_ALLOW_UNAUTHENTICATED_REMOTE` (default `false`; unsafe if `true`)
 - `ROBLOXBRIDGE_TRUST_PROXY` (default `false`)
+- `ROBLOXBRIDGE_INTROSPECTION_DEFAULT_MAX_OBJECTS`
+- `ROBLOXBRIDGE_INTROSPECTION_MAX_OBJECTS`
+- `ROBLOXBRIDGE_ASSISTANT_PROVIDER` (`deterministic|openai|openrouter|anthropic`)
+- `ROBLOXBRIDGE_ASSISTANT_TIMEOUT_MS`
+- `ROBLOXBRIDGE_ASSISTANT_TEMPERATURE`
+- `ROBLOXBRIDGE_ASSISTANT_OPENAI_MODEL`
+- `ROBLOXBRIDGE_ASSISTANT_OPENROUTER_MODEL`
+- `ROBLOXBRIDGE_ASSISTANT_ANTHROPIC_MODEL`
+- `OPENAI_API_KEY`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_HTTP_REFERER`
+- `OPENROUTER_APP_TITLE`
+- `ANTHROPIC_API_KEY`
 
 ## Docs
 

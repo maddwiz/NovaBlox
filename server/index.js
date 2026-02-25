@@ -11,7 +11,7 @@ const multer = require("multer");
 const { CommandStore } = require("./command_store");
 const { FixedWindowRateLimiter } = require("./rate_limiter");
 const {
-  buildPlan,
+  buildPlanWithAssistant,
   normalizeExternalPlan,
   queuePlan,
   listTemplates,
@@ -91,6 +91,26 @@ const RATE_LIMIT_MAX =
     ? RATE_LIMIT_MAX_RAW
     : 0;
 const STATIC_DIR = path.join(__dirname, "static");
+const INTROSPECTION_DEFAULT_MAX_OBJECTS = clampIntegerEnv(
+  process.env.ROBLOXBRIDGE_INTROSPECTION_DEFAULT_MAX_OBJECTS,
+  500,
+  1,
+  5000,
+);
+const INTROSPECTION_MAX_OBJECTS = clampIntegerEnv(
+  process.env.ROBLOXBRIDGE_INTROSPECTION_MAX_OBJECTS,
+  2000,
+  1,
+  10000,
+);
+
+function clampIntegerEnv(raw, fallback, min, max) {
+  const parsed = Number.parseInt(String(raw || ""), 10);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
+}
 
 function normalizeRole(value) {
   const role = String(value || "")
@@ -136,6 +156,159 @@ const store = new CommandStore({
   snapshotPath: QUEUE_SNAPSHOT_PATH || null,
 });
 
+const sceneIntrospectionState = {
+  status: "empty",
+  queued_command_id: null,
+  last_command_id: null,
+  queued_at: null,
+  updated_at: null,
+  error: null,
+  scene: null,
+};
+
+function shallowCopyObject(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return Object.assign({}, value);
+}
+
+function normalizeSceneSnapshot(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+
+  const objects = Array.isArray(raw.objects)
+    ? raw.objects.filter((item) => item && typeof item === "object")
+    : [];
+  const classCounts = shallowCopyObject(raw.class_counts);
+  const materials = Array.isArray(raw.materials)
+    ? raw.materials.map((item) => String(item))
+    : [];
+  const selection = Array.isArray(raw.selection)
+    ? raw.selection.map((item) => String(item))
+    : [];
+
+  const objectCountRaw =
+    raw.object_count !== undefined && raw.object_count !== null
+      ? Number.parseInt(String(raw.object_count), 10)
+      : objects.length;
+  const objectCount = Number.isFinite(objectCountRaw)
+    ? Math.max(0, objectCountRaw)
+    : objects.length;
+
+  return {
+    root: String(raw.root || "Workspace"),
+    object_count: objectCount,
+    max_objects: clampIntegerEnv(
+      raw.max_objects,
+      INTROSPECTION_DEFAULT_MAX_OBJECTS,
+      1,
+      INTROSPECTION_MAX_OBJECTS,
+    ),
+    truncated: raw.truncated === true,
+    collected_at: String(raw.collected_at || new Date().toISOString()),
+    objects,
+    class_counts: classCounts,
+    materials,
+    selection,
+  };
+}
+
+function sceneContextSummary(sceneSnapshot) {
+  if (!sceneSnapshot) {
+    return {
+      object_count: 0,
+      truncated: false,
+      class_counts: {},
+      materials: [],
+      selection: [],
+      sample_objects: [],
+    };
+  }
+  return {
+    root: sceneSnapshot.root,
+    object_count: sceneSnapshot.object_count,
+    truncated: sceneSnapshot.truncated === true,
+    class_counts: shallowCopyObject(sceneSnapshot.class_counts),
+    materials: Array.isArray(sceneSnapshot.materials)
+      ? sceneSnapshot.materials.slice(0, 80)
+      : [],
+    selection: Array.isArray(sceneSnapshot.selection)
+      ? sceneSnapshot.selection.slice(0, 40)
+      : [],
+    sample_objects: Array.isArray(sceneSnapshot.objects)
+      ? sceneSnapshot.objects.slice(0, 60)
+      : [],
+    collected_at: sceneSnapshot.collected_at,
+  };
+}
+
+function updateSceneStateOnQueued(command) {
+  if (!command) {
+    return;
+  }
+  sceneIntrospectionState.status = "queued";
+  sceneIntrospectionState.queued_command_id = command.id || null;
+  sceneIntrospectionState.last_command_id = command.id || null;
+  sceneIntrospectionState.queued_at =
+    command.created_at || new Date().toISOString();
+  sceneIntrospectionState.updated_at = sceneIntrospectionState.queued_at;
+  sceneIntrospectionState.error = null;
+}
+
+function updateSceneStateFromCommand(command) {
+  if (!command || command.action !== "introspect-scene") {
+    return;
+  }
+  sceneIntrospectionState.last_command_id = command.id || null;
+  sceneIntrospectionState.queued_command_id = null;
+  sceneIntrospectionState.updated_at =
+    command.updated_at || new Date().toISOString();
+
+  if (command.status === "succeeded") {
+    const scene = normalizeSceneSnapshot(command.result);
+    if (scene) {
+      sceneIntrospectionState.scene = scene;
+      sceneIntrospectionState.status = "succeeded";
+      sceneIntrospectionState.error = null;
+      return;
+    }
+    sceneIntrospectionState.status = "failed";
+    sceneIntrospectionState.error =
+      "introspection result missing scene snapshot payload";
+    return;
+  }
+
+  if (command.status === "failed") {
+    sceneIntrospectionState.status = "failed";
+    sceneIntrospectionState.error = String(command.error || "unknown error");
+    return;
+  }
+
+  if (command.status === "queued" || command.status === "dispatched") {
+    sceneIntrospectionState.status = command.status;
+  }
+}
+
+function resolvePlannerSceneContext(body) {
+  if (body && body.include_scene_context === false) {
+    return null;
+  }
+  if (
+    body &&
+    body.scene_context &&
+    typeof body.scene_context === "object" &&
+    !Array.isArray(body.scene_context)
+  ) {
+    return body.scene_context;
+  }
+  if (sceneIntrospectionState.scene) {
+    return sceneContextSummary(sceneIntrospectionState.scene);
+  }
+  return null;
+}
+
 const upload = multer({
   dest: IMPORT_DIR,
   limits: {
@@ -152,6 +325,7 @@ app.use((req, res, next) => {
 });
 
 app.use(blockUnauthenticatedRemote);
+app.use("/bridge/static", express.static(STATIC_DIR));
 
 const limiter = new FixedWindowRateLimiter({
   max: RATE_LIMIT_MAX,
@@ -393,7 +567,7 @@ function parseExpiresAt(payload) {
   return { ok: true, expiresAt: null };
 }
 
-function queueCommand(req, res, spec, extraPayload = {}) {
+function queueCommand(req, res, spec, extraPayload = {}, options = {}) {
   const expires = parseExpiresAt(req.body || {});
   if (!expires.ok) {
     return res.status(400).json({ status: "error", error: expires.error });
@@ -414,6 +588,9 @@ function queueCommand(req, res, spec, extraPayload = {}) {
     idempotencyKey: resolveIdempotencyKey(req, req.body || {}),
     expiresAt: expires.expiresAt,
   });
+  if (options && typeof options.onQueued === "function") {
+    options.onQueued(command, { deduped });
+  }
   return res.json({
     status: "queued",
     command_id: command.id,
@@ -687,6 +864,17 @@ function buildDocsEndpoints() {
         'curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:30010/bridge/planner/templates | jq .',
     },
     {
+      method: "GET",
+      path: "/bridge/planner/catalog",
+      auth: AUTH_ENABLED ? "read" : "none",
+      category: "planner",
+      action: "list-catalog",
+      risk: "safe",
+      description: "List route/action catalog with risk levels for planner.",
+      example_curl:
+        'curl -s -H "X-API-Key: $API_KEY" http://127.0.0.1:30010/bridge/planner/catalog | jq .',
+    },
+    {
       method: "POST",
       path: "/bridge/assistant/plan",
       auth: AUTH_ENABLED ? "read" : "none",
@@ -709,6 +897,28 @@ function buildDocsEndpoints() {
         "Queue all commands from a generated plan (with danger guardrail).",
       example_curl:
         'curl -s -X POST http://127.0.0.1:30010/bridge/assistant/execute -H "X-API-Key: $API_KEY" -H \'Content-Type: application/json\' -d \'{"prompt":"terrain generator"}\' | jq .',
+    },
+    {
+      method: "POST",
+      path: "/bridge/introspection/scene",
+      auth: AUTH_ENABLED ? "write" : "none",
+      category: "introspection",
+      action: "introspect-scene",
+      risk: "safe",
+      description: "Queue scene hierarchy introspection from Studio plugin.",
+      example_curl:
+        "curl -s -X POST http://127.0.0.1:30010/bridge/introspection/scene -H \"X-API-Key: $API_KEY\" -H 'Content-Type: application/json' -d '{\"max_objects\":500}' | jq .",
+    },
+    {
+      method: "GET",
+      path: "/bridge/introspection/scene",
+      auth: AUTH_ENABLED ? "read" : "none",
+      category: "introspection",
+      action: "get-introspection",
+      risk: "safe",
+      description: "Read latest cached scene introspection snapshot.",
+      example_curl:
+        'curl -s -H "X-API-Key: $API_KEY" "http://127.0.0.1:30010/bridge/introspection/scene?include_objects=false" | jq .',
     },
     {
       method: "GET",
@@ -796,6 +1006,17 @@ app.get("/bridge/health", (_req, res) => {
       max_requests: RATE_LIMIT_MAX,
       exempt_local: RATE_LIMIT_EXEMPT_LOCAL,
     },
+    introspection: {
+      state: sceneIntrospectionState.status,
+      updated_at: sceneIntrospectionState.updated_at,
+      last_command_id: sceneIntrospectionState.last_command_id,
+      object_count: sceneIntrospectionState.scene
+        ? sceneIntrospectionState.scene.object_count
+        : 0,
+      truncated: sceneIntrospectionState.scene
+        ? sceneIntrospectionState.scene.truncated === true
+        : false,
+    },
   });
 });
 
@@ -838,6 +1059,20 @@ app.get("/bridge/capabilities", (_req, res) => {
         templates: listTemplates().map((item) => item.id),
         catalog_size: listCommandCatalog().length,
         requires_allow_dangerous: true,
+        llm_providers_supported: [
+          "deterministic",
+          "openai",
+          "openrouter",
+          "anthropic",
+        ],
+        scene_context_from_cache: true,
+      },
+      introspection: {
+        scene_snapshot: true,
+        queue_route: "/bridge/introspection/scene",
+        cache_route: "/bridge/introspection/scene",
+        default_max_objects: INTROSPECTION_DEFAULT_MAX_OBJECTS,
+        max_objects: INTROSPECTION_MAX_OBJECTS,
       },
     },
   });
@@ -858,28 +1093,126 @@ app.get("/bridge/planner/catalog", ...readAccess, (_req, res) => {
   });
 });
 
-app.post("/bridge/assistant/plan", ...readAccess, (req, res) => {
-  const plan = buildPlan({
-    prompt: req.body && req.body.prompt ? req.body.prompt : "",
-    template: req.body && req.body.template ? req.body.template : "",
-    voice_mode: req.body && req.body.voice_mode === true,
-  });
+app.post("/bridge/introspection/scene", ...writeAccess, (req, res) => {
+  const maxObjects = parseInteger(
+    req.body && req.body.max_objects,
+    INTROSPECTION_DEFAULT_MAX_OBJECTS,
+    1,
+    INTROSPECTION_MAX_OBJECTS,
+  );
+  const includeSelection = !(req.body && req.body.include_selection === false);
+  const includeNonWorkspace =
+    req.body && req.body.include_non_workspace === true;
+  return queueCommand(
+    req,
+    res,
+    {
+      path: "/bridge/introspection/scene",
+      category: "introspection",
+      action: "introspect-scene",
+    },
+    {
+      max_objects: maxObjects,
+      include_selection: includeSelection,
+      include_non_workspace: includeNonWorkspace,
+    },
+    {
+      onQueued: (command) => updateSceneStateOnQueued(command),
+    },
+  );
+});
+
+app.get("/bridge/introspection/scene", ...readAccess, (req, res) => {
+  const includeObjects =
+    String(req.query.include_objects || "true")
+      .trim()
+      .toLowerCase() !== "false";
+  const scene = includeObjects
+    ? sceneIntrospectionState.scene
+    : sceneContextSummary(sceneIntrospectionState.scene);
   return res.json({
     status: "ok",
-    plan,
+    introspection: {
+      state: sceneIntrospectionState.status,
+      queued_command_id: sceneIntrospectionState.queued_command_id,
+      last_command_id: sceneIntrospectionState.last_command_id,
+      queued_at: sceneIntrospectionState.queued_at,
+      updated_at: sceneIntrospectionState.updated_at,
+      error: sceneIntrospectionState.error,
+      scene: scene || null,
+    },
   });
 });
 
-app.post("/bridge/assistant/execute", ...writeAccess, (req, res) => {
-  const suppliedPlan = normalizeExternalPlan(req.body ? req.body.plan : null);
-  const plan =
-    suppliedPlan ||
-    buildPlan({
-      prompt: req.body && req.body.prompt ? req.body.prompt : "",
-      template: req.body && req.body.template ? req.body.template : "",
-      voice_mode: req.body && req.body.voice_mode === true,
+app.post("/bridge/assistant/plan", ...readAccess, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const sceneContext = resolvePlannerSceneContext(body);
+    const built = await buildPlanWithAssistant({
+      prompt: body.prompt || "",
+      template: body.template || "",
+      voice_mode: body.voice_mode === true,
+      use_llm: body.use_llm === true,
+      provider: body.provider || "",
+      model: body.model || "",
+      temperature: body.temperature,
+      timeout_ms: body.timeout_ms,
+      allow_dangerous: body.allow_dangerous === true,
+      scene_context: sceneContext,
     });
-  const allowDangerous = req.body && req.body.allow_dangerous === true;
+    return res.json({
+      status: "ok",
+      plan: built.plan,
+      assistant: built.assistant,
+      scene_context: sceneContext,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      status: "error",
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+app.post("/bridge/assistant/execute", ...writeAccess, async (req, res) => {
+  const body = req.body || {};
+  const suppliedPlan = normalizeExternalPlan(body.plan);
+  const allowDangerous = body.allow_dangerous === true;
+  let plan = suppliedPlan;
+  let assistant = null;
+  let sceneContext = null;
+
+  if (!plan) {
+    try {
+      sceneContext = resolvePlannerSceneContext(body);
+      const built = await buildPlanWithAssistant({
+        prompt: body.prompt || "",
+        template: body.template || "",
+        voice_mode: body.voice_mode === true,
+        use_llm: body.use_llm === true,
+        provider: body.provider || "",
+        model: body.model || "",
+        temperature: body.temperature,
+        timeout_ms: body.timeout_ms,
+        allow_dangerous: allowDangerous,
+        scene_context: sceneContext,
+      });
+      plan = built.plan;
+      assistant = built.assistant;
+    } catch (error) {
+      return res.status(500).json({
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  } else {
+    assistant = {
+      source: "external-plan",
+      used_llm: false,
+      fallback: false,
+      provider_requested: null,
+    };
+  }
 
   if (!plan || !Array.isArray(plan.commands) || plan.commands.length === 0) {
     return res.status(400).json({
@@ -925,6 +1258,8 @@ app.post("/bridge/assistant/execute", ...writeAccess, (req, res) => {
     expires_at: queued.expires_at || null,
     risk_summary: plan.risk_summary,
     warnings: plan.warnings || [],
+    assistant,
+    scene_context: sceneContext,
   });
 });
 
@@ -1034,6 +1369,7 @@ app.post("/bridge/results", ...writeAccess, (req, res) => {
   if (!result.ok) {
     return res.status(400).json({ status: "error", error: result.error });
   }
+  updateSceneStateFromCommand(result.command);
   return res.json({
     status: "ok",
     duplicate: result.duplicate === true,
@@ -1052,6 +1388,11 @@ app.post("/bridge/results/batch", ...writeAccess, (req, res) => {
       .json({ status: "error", error: "results[] is required" });
   }
   const batch = store.resultBatch(results);
+  for (const outcome of batch.outcomes) {
+    if (outcome && outcome.ok && outcome.command) {
+      updateSceneStateFromCommand(outcome.command);
+    }
+  }
   const normalized = batch.outcomes.map((outcome) => {
     if (!outcome.ok) {
       return {

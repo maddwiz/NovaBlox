@@ -14,6 +14,7 @@ Then:
    ```bash
    npm run studio:sync
    ```
+   Re-run this after any `.env` host/API key update.
 3. Restart Studio, then open `Plugins > NovaBlox > Panel` and follow the First-Run Wizard (`Next Step`).
 4. Queue your first command:
 

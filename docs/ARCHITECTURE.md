@@ -2,7 +2,7 @@
 
 ```text
 AI Agent / OpenClaw / MCP
-  -> Planner Engine (deterministic templates + risk policy)
+  -> Planner Engine (deterministic templates + optional LLM providers + risk policy)
   -> NovaBlox HTTP Bridge (Node.js)
     -> Command Queue (in-memory + snapshot persistence, lease + retries)
       -> Roblox Studio Plugin (poll + SSE-triggered fetch)
@@ -30,6 +30,7 @@ AI Agent / OpenClaw / MCP
 - Polling is default and always supported.
 - SSE endpoint (`/bridge/stream`) pushes notifications so clients can fetch immediately.
 - Browser Studio UI (`/bridge/studio`) provides text/voice planning and plan queue controls.
+- Scene introspection (`POST/GET /bridge/introspection/scene`) provides cached Workspace context for planner prompts.
 
 ## Security controls
 

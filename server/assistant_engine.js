@@ -48,8 +48,44 @@ const TEMPLATE_ALIASES = Object.freeze({
   lighting_mood_presets: "lighting_mood_presets",
 });
 
+const ROUTE_BY_ACTION = new Map();
+for (const item of listCommandCatalog()) {
+  if (item && item.action && item.route && !ROUTE_BY_ACTION.has(item.action)) {
+    ROUTE_BY_ACTION.set(item.action, item.route);
+  }
+}
+
+let fetchImplementation = (...args) => fetch(...args);
+
+function setFetchImplementation(fetchImpl) {
+  if (typeof fetchImpl !== "function") {
+    throw new Error("fetch implementation must be a function");
+  }
+  fetchImplementation = fetchImpl;
+}
+
+function resetFetchImplementation() {
+  fetchImplementation = (...args) => fetch(...args);
+}
+
 function normalizeString(value) {
   return String(value || "").trim();
+}
+
+function normalizeProvider(value) {
+  const provider = normalizeString(value).toLowerCase();
+  if (
+    provider === "openai" ||
+    provider === "openrouter" ||
+    provider === "anthropic" ||
+    provider === "deterministic"
+  ) {
+    return provider;
+  }
+  if (provider === "auto" || provider === "llm") {
+    return provider;
+  }
+  return "";
 }
 
 function clampInt(value, min, max, fallback) {
@@ -58,6 +94,83 @@ function clampInt(value, min, max, fallback) {
     return fallback;
   }
   return Math.max(min, Math.min(max, parsed));
+}
+
+function clampFloat(value, min, max, fallback) {
+  const parsed = Number.parseFloat(String(value || ""));
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function safeJsonParse(text) {
+  if (typeof text !== "string") {
+    return null;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (_err) {
+    return null;
+  }
+}
+
+function extractFirstJsonObject(text) {
+  const source = normalizeString(text);
+  if (!source) {
+    return null;
+  }
+
+  const direct = safeJsonParse(source);
+  if (direct && typeof direct === "object") {
+    return direct;
+  }
+
+  for (let start = 0; start < source.length; start += 1) {
+    if (source[start] !== "{") {
+      continue;
+    }
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    for (let i = start; i < source.length; i += 1) {
+      const ch = source[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (ch === "\\") {
+          escaped = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === "{") {
+        depth += 1;
+        continue;
+      }
+      if (ch === "}") {
+        depth -= 1;
+        if (depth === 0) {
+          const candidate = source.slice(start, i + 1);
+          const parsed = safeJsonParse(candidate);
+          if (parsed && typeof parsed === "object") {
+            return parsed;
+          }
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 function deterministicNumber(seed, min, max) {
@@ -569,6 +682,458 @@ function buildPlan(input = {}) {
   return plan;
 }
 
+function inferAutoProvider() {
+  if (normalizeString(process.env.OPENAI_API_KEY)) {
+    return "openai";
+  }
+  if (normalizeString(process.env.OPENROUTER_API_KEY)) {
+    return "openrouter";
+  }
+  if (normalizeString(process.env.ANTHROPIC_API_KEY)) {
+    return "anthropic";
+  }
+  return "deterministic";
+}
+
+function resolveRequestedProvider(input = {}) {
+  const explicit = normalizeProvider(input.provider);
+  if (explicit && explicit !== "auto" && explicit !== "llm") {
+    return explicit;
+  }
+
+  const useLlm = input.use_llm === true;
+  if (explicit === "auto" || explicit === "llm" || useLlm) {
+    const envProvider = normalizeProvider(
+      process.env.ROBLOXBRIDGE_ASSISTANT_PROVIDER,
+    );
+    if (envProvider && envProvider !== "auto" && envProvider !== "llm") {
+      return envProvider;
+    }
+    return inferAutoProvider();
+  }
+
+  return "deterministic";
+}
+
+function buildProviderConfig(input = {}) {
+  const provider = resolveRequestedProvider(input);
+  const timeoutMs = clampInt(
+    input.timeout_ms || process.env.ROBLOXBRIDGE_ASSISTANT_TIMEOUT_MS,
+    2000,
+    120000,
+    20000,
+  );
+  const temperature = clampFloat(
+    input.temperature || process.env.ROBLOXBRIDGE_ASSISTANT_TEMPERATURE,
+    0,
+    1,
+    0.15,
+  );
+
+  const config = {
+    provider,
+    timeout_ms: timeoutMs,
+    temperature,
+  };
+
+  if (provider === "openai") {
+    config.api_key = normalizeString(process.env.OPENAI_API_KEY);
+    config.base_url =
+      normalizeString(process.env.ROBLOXBRIDGE_ASSISTANT_OPENAI_BASE_URL) ||
+      "https://api.openai.com/v1";
+    config.model =
+      normalizeString(input.model) ||
+      normalizeString(process.env.ROBLOXBRIDGE_ASSISTANT_OPENAI_MODEL) ||
+      "gpt-4.1-mini";
+  } else if (provider === "openrouter") {
+    config.api_key = normalizeString(process.env.OPENROUTER_API_KEY);
+    config.base_url =
+      normalizeString(process.env.ROBLOXBRIDGE_ASSISTANT_OPENROUTER_BASE_URL) ||
+      "https://openrouter.ai/api/v1";
+    config.model =
+      normalizeString(input.model) ||
+      normalizeString(process.env.ROBLOXBRIDGE_ASSISTANT_OPENROUTER_MODEL) ||
+      "openai/gpt-4.1-mini";
+    config.extra_headers = {};
+    const referer = normalizeString(process.env.OPENROUTER_HTTP_REFERER);
+    const title =
+      normalizeString(process.env.OPENROUTER_APP_TITLE) || "NovaBlox";
+    if (referer) {
+      config.extra_headers["HTTP-Referer"] = referer;
+    }
+    if (title) {
+      config.extra_headers["X-Title"] = title;
+    }
+  } else if (provider === "anthropic") {
+    config.api_key = normalizeString(process.env.ANTHROPIC_API_KEY);
+    config.base_url =
+      normalizeString(process.env.ROBLOXBRIDGE_ASSISTANT_ANTHROPIC_BASE_URL) ||
+      "https://api.anthropic.com";
+    config.model =
+      normalizeString(input.model) ||
+      normalizeString(process.env.ROBLOXBRIDGE_ASSISTANT_ANTHROPIC_MODEL) ||
+      "claude-3-5-sonnet-latest";
+  }
+
+  return config;
+}
+
+function shortenErrorDetail(raw, maxLength = 300) {
+  const text = normalizeString(raw);
+  if (!text) {
+    return "";
+  }
+  if (text.length <= maxLength) {
+    return text;
+  }
+  return `${text.slice(0, maxLength)}...`;
+}
+
+async function fetchJsonWithTimeout(url, init, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImplementation(url, {
+      ...init,
+      signal: controller.signal,
+    });
+    const rawText = await response.text();
+    const parsed = safeJsonParse(rawText);
+    if (!response.ok) {
+      throw new Error(
+        `HTTP ${response.status}: ${shortenErrorDetail(
+          parsed ? JSON.stringify(parsed) : rawText,
+        )}`,
+      );
+    }
+    return parsed || {};
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function openAiMessageToText(content) {
+  if (typeof content === "string") {
+    return content;
+  }
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  return content
+    .map((part) => {
+      if (!part || typeof part !== "object") {
+        return "";
+      }
+      if (typeof part.text === "string") {
+        return part.text;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+function anthropicMessageToText(content) {
+  if (!Array.isArray(content)) {
+    return "";
+  }
+  return content
+    .map((part) => {
+      if (!part || typeof part !== "object") {
+        return "";
+      }
+      if (part.type === "text" && typeof part.text === "string") {
+        return part.text;
+      }
+      return "";
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function callOpenAiCompatiblePlan(systemPrompt, userPrompt, config) {
+  if (!config.api_key) {
+    throw new Error(`missing API key for provider ${config.provider}`);
+  }
+  const headers = Object.assign(
+    {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.api_key}`,
+    },
+    config.extra_headers || {},
+  );
+  const baseUrl = String(config.base_url || "").replace(/\/+$/, "");
+  const payload = await fetchJsonWithTimeout(
+    `${baseUrl}/chat/completions`,
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: config.model,
+        temperature: config.temperature,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    },
+    config.timeout_ms,
+  );
+  const content = openAiMessageToText(
+    payload &&
+      payload.choices &&
+      payload.choices[0] &&
+      payload.choices[0].message
+      ? payload.choices[0].message.content
+      : "",
+  );
+  const parsed = extractFirstJsonObject(content);
+  if (!parsed) {
+    throw new Error("provider response did not contain valid JSON plan");
+  }
+  return parsed;
+}
+
+async function callAnthropicPlan(systemPrompt, userPrompt, config) {
+  if (!config.api_key) {
+    throw new Error("missing ANTHROPIC_API_KEY");
+  }
+  const baseUrl = String(config.base_url || "").replace(/\/+$/, "");
+  const payload = await fetchJsonWithTimeout(
+    `${baseUrl}/v1/messages`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": config.api_key,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: config.model,
+        system: systemPrompt,
+        max_tokens: 1400,
+        temperature: config.temperature,
+        messages: [{ role: "user", content: userPrompt }],
+      }),
+    },
+    config.timeout_ms,
+  );
+  const parsed = extractFirstJsonObject(
+    anthropicMessageToText(payload.content),
+  );
+  if (!parsed) {
+    throw new Error("anthropic response did not contain valid JSON plan");
+  }
+  return parsed;
+}
+
+function buildPlannerSystemPrompt() {
+  return [
+    "You are NovaBlox assistant planner for Roblox Studio automation.",
+    "Return JSON only. Do not include markdown, code fences, or prose.",
+    "Use only routes that exist in command_catalog_json.",
+    "Prefer safe/caution actions and avoid dangerous actions unless prompt explicitly requests them.",
+    "Output schema:",
+    "{",
+    '  "title": "string",',
+    '  "summary": "string",',
+    '  "commands": [',
+    '    { "route": "/bridge/...", "reason": "string", "payload": { "...": "..." } }',
+    "  ]",
+    "}",
+  ].join("\n");
+}
+
+function buildPlannerUserPrompt(input) {
+  return [
+    `prompt=${normalizeString(input.prompt)}`,
+    `template_requested=${normalizeString(input.template) || "auto"}`,
+    `voice_mode=${input.voice_mode === true ? "true" : "false"}`,
+    `allow_dangerous=${input.allow_dangerous === true ? "true" : "false"}`,
+    "scene_context_json=",
+    JSON.stringify(input.scene_context || {}, null, 2),
+    "command_catalog_json=",
+    JSON.stringify(input.catalog || [], null, 2),
+  ].join("\n");
+}
+
+function resolveRouteFromLlmCommand(rawCommand) {
+  const route = normalizeString(rawCommand && rawCommand.route);
+  if (route) {
+    const byRoute = commandForRoute(route);
+    if (byRoute) {
+      return byRoute.route;
+    }
+  }
+  const action = normalizeString(rawCommand && rawCommand.action).toLowerCase();
+  if (action && ROUTE_BY_ACTION.has(action)) {
+    return ROUTE_BY_ACTION.get(action);
+  }
+  return null;
+}
+
+function normalizeLlmPlan(rawPlan, input = {}, source = "llm") {
+  if (!rawPlan || typeof rawPlan !== "object") {
+    return { plan: null, warnings: ["LLM response was not an object."] };
+  }
+
+  const rawCommands = Array.isArray(rawPlan.commands) ? rawPlan.commands : [];
+  const maxCommands = clampInt(input.max_commands, 1, 80, 40);
+  const commands = [];
+  const warnings = [];
+  let dropped = 0;
+
+  for (const rawCommand of rawCommands) {
+    if (commands.length >= maxCommands) {
+      dropped += 1;
+      continue;
+    }
+    const route = resolveRouteFromLlmCommand(rawCommand || {});
+    if (!route) {
+      dropped += 1;
+      continue;
+    }
+
+    const entry = commandForRoute(route);
+    if (!entry) {
+      dropped += 1;
+      continue;
+    }
+
+    commands.push({
+      route: entry.route,
+      category: entry.category,
+      action: entry.action,
+      risk: entry.risk || riskForAction(entry.action),
+      reason:
+        normalizeString(
+          rawCommand &&
+            (rawCommand.reason || rawCommand.summary || rawCommand.note),
+        ) || entry.summary,
+      payload:
+        rawCommand &&
+        rawCommand.payload &&
+        typeof rawCommand.payload === "object" &&
+        !Array.isArray(rawCommand.payload)
+          ? rawCommand.payload
+          : {},
+    });
+  }
+
+  if (dropped > 0) {
+    warnings.push(`Dropped ${dropped} unsupported or invalid LLM command(s).`);
+  }
+  if (commands.length === 0) {
+    warnings.push("No valid commands were produced by LLM output.");
+    return { plan: null, warnings };
+  }
+
+  const plan = {
+    id:
+      normalizeString(rawPlan.id || rawPlan.plan_id || rawPlan.planId) ||
+      randomUUID(),
+    created_at: new Date().toISOString(),
+    workflow: {
+      template:
+        normalizeString(rawPlan.template || rawPlan.workflow_template) ||
+        "llm_freeform",
+      deterministic: false,
+      provider: source,
+    },
+    input: {
+      prompt: normalizeString(input.prompt),
+      template_requested: normalizeString(input.template) || null,
+      voice_mode: input.voice_mode === true,
+    },
+    title: normalizeString(rawPlan.title) || "LLM Assistant Plan",
+    summary:
+      normalizeString(rawPlan.summary) ||
+      "LLM-generated Roblox Studio command sequence.",
+    commands,
+  };
+
+  plan.risk_summary = summarizeRisk(plan.commands);
+  plan.warnings = buildWarnings(plan).concat(warnings);
+  return { plan, warnings };
+}
+
+async function buildPlanWithAssistant(input = {}) {
+  const deterministicPlan = buildPlan(input);
+  const config = buildProviderConfig(input);
+
+  if (config.provider === "deterministic") {
+    return {
+      plan: deterministicPlan,
+      assistant: {
+        source: "deterministic",
+        used_llm: false,
+        fallback: false,
+        provider_requested: normalizeString(input.provider) || null,
+      },
+    };
+  }
+
+  const systemPrompt = buildPlannerSystemPrompt();
+  const userPrompt = buildPlannerUserPrompt({
+    prompt: input.prompt,
+    template: input.template,
+    voice_mode: input.voice_mode === true,
+    allow_dangerous: input.allow_dangerous === true,
+    scene_context:
+      input.scene_context && typeof input.scene_context === "object"
+        ? input.scene_context
+        : null,
+    catalog: listCommandCatalog(),
+  });
+
+  try {
+    let rawPlan = null;
+    if (config.provider === "openai" || config.provider === "openrouter") {
+      rawPlan = await callOpenAiCompatiblePlan(
+        systemPrompt,
+        userPrompt,
+        config,
+      );
+    } else if (config.provider === "anthropic") {
+      rawPlan = await callAnthropicPlan(systemPrompt, userPrompt, config);
+    } else {
+      throw new Error(`unsupported provider: ${config.provider}`);
+    }
+
+    const normalized = normalizeLlmPlan(rawPlan, input, config.provider);
+    if (!normalized.plan) {
+      throw new Error(normalized.warnings.join(" "));
+    }
+
+    return {
+      plan: normalized.plan,
+      assistant: {
+        source: config.provider,
+        used_llm: true,
+        fallback: false,
+        provider_requested: normalizeString(input.provider) || config.provider,
+      },
+    };
+  } catch (error) {
+    deterministicPlan.warnings = deterministicPlan.warnings.concat(
+      `LLM fallback (${config.provider}): ${error.message}`,
+    );
+    deterministicPlan.workflow.provider = "deterministic";
+    deterministicPlan.workflow.deterministic = true;
+    return {
+      plan: deterministicPlan,
+      assistant: {
+        source: "deterministic",
+        used_llm: false,
+        fallback: true,
+        provider_requested: config.provider,
+        error: String(error.message || error),
+      },
+    };
+  }
+}
+
 function normalizeExternalPlan(rawPlan) {
   if (!rawPlan || typeof rawPlan !== "object") {
     return null;
@@ -698,7 +1263,17 @@ module.exports = {
   TEMPLATE_METADATA,
   listTemplates,
   buildPlan,
+  buildPlanWithAssistant,
   normalizeExternalPlan,
   queuePlan,
   listCommandCatalog,
+  __internal: {
+    safeJsonParse,
+    extractFirstJsonObject,
+    normalizeLlmPlan,
+    resolveRequestedProvider,
+    buildProviderConfig,
+    setFetchImplementation,
+    resetFetchImplementation,
+  },
 };

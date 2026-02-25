@@ -311,6 +311,12 @@ const BASE_CATALOG = Object.freeze([
     summary: "Autosave workspace state",
   },
   {
+    route: "/bridge/introspection/scene",
+    category: "introspection",
+    action: "introspect-scene",
+    summary: "Capture current Studio scene hierarchy snapshot",
+  },
+  {
     route: "/bridge/test-spawn",
     category: "test",
     action: "test-spawn",

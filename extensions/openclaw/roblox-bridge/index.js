@@ -386,6 +386,36 @@ const QUEUE_PARAMS = Type.Object({
   ),
 });
 
+const ASSISTANT_PLAN_PARAMS = Type.Object({
+  prompt: Type.String({ minLength: 1 }),
+  template: Type.Optional(Type.String()),
+  use_llm: Type.Optional(Type.Boolean()),
+  provider: Type.Optional(Type.String()),
+  model: Type.Optional(Type.String()),
+  temperature: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+  include_scene_context: Type.Optional(Type.Boolean()),
+});
+
+const ASSISTANT_EXECUTE_PARAMS = Type.Object({
+  prompt: Type.Optional(Type.String()),
+  template: Type.Optional(Type.String()),
+  plan: Type.Optional(Type.Any()),
+  allow_dangerous: Type.Optional(Type.Boolean()),
+  use_llm: Type.Optional(Type.Boolean()),
+  provider: Type.Optional(Type.String()),
+  model: Type.Optional(Type.String()),
+  temperature: Type.Optional(Type.Number({ minimum: 0, maximum: 1 })),
+  include_scene_context: Type.Optional(Type.Boolean()),
+  expires_in_ms: Type.Optional(Type.Number()),
+  idempotency_prefix: Type.Optional(Type.String()),
+});
+
+const INTROSPECTION_PARAMS = Type.Object({
+  max_objects: Type.Optional(Type.Number({ minimum: 1, maximum: 10000 })),
+  include_selection: Type.Optional(Type.Boolean()),
+  include_non_workspace: Type.Optional(Type.Boolean()),
+});
+
 module.exports = {
   id: "novablox-roblox-bridge",
   name: "NovaBlox Roblox Bridge",
@@ -493,6 +523,115 @@ module.exports = {
           metadata: params.metadata,
           payload: params.payload || {},
         });
+      },
+    });
+
+    api.registerTool({
+      name: "roblox_planner_templates",
+      label: "Planner Templates",
+      description: "List NovaBlox deterministic planner templates.",
+      parameters: Type.Object({}),
+      async execute() {
+        return run("GET", "/bridge/planner/templates");
+      },
+    });
+
+    api.registerTool({
+      name: "roblox_planner_catalog",
+      label: "Planner Catalog",
+      description: "List planner command catalog with risk levels.",
+      parameters: Type.Object({}),
+      async execute() {
+        return run("GET", "/bridge/planner/catalog");
+      },
+    });
+
+    api.registerTool({
+      name: "roblox_assistant_plan",
+      label: "Assistant Plan",
+      description: "Generate a NovaBlox assistant plan from a prompt.",
+      parameters: ASSISTANT_PLAN_PARAMS,
+      async execute(_id, params) {
+        const body = {
+          prompt: params.prompt,
+        };
+        if (params.template !== undefined) {
+          body.template = params.template;
+        }
+        if (params.use_llm !== undefined) {
+          body.use_llm = params.use_llm;
+        }
+        if (params.provider !== undefined) {
+          body.provider = params.provider;
+        }
+        if (params.model !== undefined) {
+          body.model = params.model;
+        }
+        if (params.temperature !== undefined) {
+          body.temperature = params.temperature;
+        }
+        if (params.include_scene_context !== undefined) {
+          body.include_scene_context = params.include_scene_context;
+        }
+        return run("POST", "/bridge/assistant/plan", body);
+      },
+    });
+
+    api.registerTool({
+      name: "roblox_assistant_execute",
+      label: "Assistant Execute",
+      description:
+        "Queue commands from generated (or provided) assistant plan.",
+      parameters: ASSISTANT_EXECUTE_PARAMS,
+      async execute(_id, params) {
+        const body = {};
+        [
+          "prompt",
+          "template",
+          "plan",
+          "allow_dangerous",
+          "use_llm",
+          "provider",
+          "model",
+          "temperature",
+          "include_scene_context",
+          "expires_in_ms",
+          "idempotency_prefix",
+        ].forEach((key) => {
+          if (params[key] !== undefined) {
+            body[key] = params[key];
+          }
+        });
+        return run("POST", "/bridge/assistant/execute", body);
+      },
+    });
+
+    api.registerTool({
+      name: "roblox_scene_introspect",
+      label: "Scene Introspect",
+      description: "Queue scene hierarchy introspection command in Studio.",
+      parameters: INTROSPECTION_PARAMS,
+      async execute(_id, params) {
+        return run("POST", "/bridge/introspection/scene", params || {});
+      },
+    });
+
+    api.registerTool({
+      name: "roblox_scene_introspection",
+      label: "Scene Introspection",
+      description: "Read latest cached scene introspection snapshot.",
+      parameters: Type.Object({
+        include_objects: Type.Optional(Type.Boolean()),
+      }),
+      async execute(_id, params) {
+        const includeObjects =
+          params && params.include_objects !== undefined
+            ? params.include_objects
+            : false;
+        return run(
+          "GET",
+          `/bridge/introspection/scene?include_objects=${includeObjects ? "true" : "false"}`,
+        );
       },
     });
 

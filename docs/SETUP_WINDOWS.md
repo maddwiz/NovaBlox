@@ -19,7 +19,9 @@ scripts\start-server-windows.bat
 2. Open a place.
 3. Load `plugin\RobloxStudioBridge.lua`.
 4. Save as Local Plugin.
-5. Restart Studio and click `Plugins > NovaBlox > Bridge`.
+5. In a NovaBlox terminal, run `npm run studio:sync` (auto-writes host/API key).
+6. Re-run `npm run studio:sync` after any `.env` host/API key change.
+7. Restart Studio and click `Plugins > NovaBlox > Panel` to run the First-Run Wizard.
 
 ## Smoke test
 

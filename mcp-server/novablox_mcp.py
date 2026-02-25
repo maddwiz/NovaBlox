@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -163,6 +164,94 @@ def roblox_import_blender(
             parent_path=parent_path,
         )
     )
+
+
+@mcp.tool()
+def roblox_planner_templates() -> Dict[str, Any]:
+    """List deterministic assistant templates."""
+    return _wrap(client.planner_templates)
+
+
+@mcp.tool()
+def roblox_planner_catalog() -> Dict[str, Any]:
+    """List assistant command catalog with risk levels."""
+    return _wrap(client.planner_catalog)
+
+
+@mcp.tool()
+def roblox_assistant_plan(
+    prompt: str,
+    template: Optional[str] = None,
+    use_llm: bool = False,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    include_scene_context: bool = True,
+) -> Dict[str, Any]:
+    """Generate a command plan from natural language."""
+    return _wrap(
+        lambda: client.plan(
+            prompt=prompt,
+            template=template,
+            use_llm=use_llm,
+            provider=provider,
+            model=model,
+            include_scene_context=include_scene_context,
+        )
+    )
+
+
+@mcp.tool()
+def roblox_assistant_execute(
+    prompt: Optional[str] = None,
+    template: Optional[str] = None,
+    plan_json: Optional[str] = None,
+    allow_dangerous: bool = False,
+    use_llm: bool = False,
+    provider: Optional[str] = None,
+    model: Optional[str] = None,
+    include_scene_context: bool = True,
+) -> Dict[str, Any]:
+    """Queue commands from generated prompt or provided plan JSON."""
+
+    def _run() -> Dict[str, Any]:
+        plan: Optional[Dict[str, Any]] = None
+        if plan_json:
+            parsed = json.loads(plan_json)
+            if not isinstance(parsed, dict):
+                raise NovaBloxError("plan_json must decode to a JSON object")
+            plan = parsed
+        return client.execute_plan(
+            plan=plan,
+            prompt=prompt,
+            template=template,
+            allow_dangerous=allow_dangerous,
+            use_llm=use_llm,
+            provider=provider,
+            model=model,
+            include_scene_context=include_scene_context,
+        )
+
+    return _wrap(_run)
+
+
+@mcp.tool()
+def roblox_scene_introspect(
+    max_objects: int = 500,
+    include_selection: bool = True,
+) -> Dict[str, Any]:
+    """Queue scene hierarchy introspection command in Studio."""
+    return _wrap(
+        lambda: client.introspect_scene(
+            max_objects=max_objects,
+            include_selection=include_selection,
+        )
+    )
+
+
+@mcp.tool()
+def roblox_scene_introspection(include_objects: bool = False) -> Dict[str, Any]:
+    """Get latest cached scene introspection snapshot."""
+    return _wrap(lambda: client.scene_introspection(include_objects=include_objects))
 
 
 def main() -> None:

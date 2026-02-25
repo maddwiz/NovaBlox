@@ -493,6 +493,120 @@ local function safeMember(obj, key)
   return nil
 end
 
+local function round3(value)
+  local n = tonumber(value) or 0
+  return math.floor(n * 1000 + 0.5) / 1000
+end
+
+local function vectorToArray(vec)
+  return { round3(vec.X), round3(vec.Y), round3(vec.Z) }
+end
+
+local function materialToString(materialEnum)
+  local raw = tostring(materialEnum or "")
+  return string.gsub(raw, "^Enum.Material%.", "")
+end
+
+local function colorToArray(color)
+  if not color then
+    return nil
+  end
+  return {
+    math.floor(math.clamp(color.R, 0, 1) * 255 + 0.5),
+    math.floor(math.clamp(color.G, 0, 1) * 255 + 0.5),
+    math.floor(math.clamp(color.B, 0, 1) * 255 + 0.5),
+  }
+end
+
+local function buildSceneSnapshot(payload)
+  local maxObjects = math.floor(tonumber(payload.max_objects) or 500)
+  maxObjects = math.clamp(maxObjects, 1, 5000)
+
+  local queue = {}
+  local queueIndex = 1
+  table.insert(queue, workspace)
+
+  local objects = {}
+  local classCounts = {}
+  local materialIndex = {}
+  local selectionPaths = {}
+  local truncated = false
+
+  while queueIndex <= #queue do
+    local node = queue[queueIndex]
+    queueIndex += 1
+
+    if node ~= workspace then
+      if #objects >= maxObjects then
+        truncated = true
+        break
+      end
+
+      local parentPath = node.Parent and node.Parent:GetFullName() or "Workspace"
+      local entry = {
+        name = node.Name,
+        class_name = node.ClassName,
+        path = node:GetFullName(),
+        parent_path = parentPath,
+      }
+
+      classCounts[node.ClassName] = (classCounts[node.ClassName] or 0) + 1
+
+      if node:IsA("BasePart") then
+        entry.position = vectorToArray(node.Position)
+        entry.size = vectorToArray(node.Size)
+        entry.material = materialToString(node.Material)
+        entry.color = colorToArray(node.Color)
+        entry.anchored = node.Anchored
+        entry.can_collide = node.CanCollide
+        materialIndex[entry.material] = true
+      elseif node:IsA("Model") then
+        local okPivot, pivot = pcall(function()
+          return node:GetPivot()
+        end)
+        if okPivot and pivot then
+          entry.pivot = {
+            round3(pivot.X),
+            round3(pivot.Y),
+            round3(pivot.Z),
+          }
+        end
+      end
+
+      table.insert(objects, entry)
+    end
+
+    for _, child in ipairs(node:GetChildren()) do
+      table.insert(queue, child)
+    end
+  end
+
+  local materials = {}
+  for matName, present in pairs(materialIndex) do
+    if present then
+      table.insert(materials, matName)
+    end
+  end
+  table.sort(materials)
+
+  local selected = Selection:Get()
+  for _, instance in ipairs(selected) do
+    table.insert(selectionPaths, instance:GetFullName())
+  end
+
+  return {
+    root = workspace:GetFullName(),
+    object_count = #objects,
+    max_objects = maxObjects,
+    truncated = truncated,
+    class_counts = classCounts,
+    materials = materials,
+    selection = selectionPaths,
+    collected_at = nowIso(),
+    objects = objects,
+  }
+end
+
 local function execute(command)
   local action = command.action
   local payload = command.payload or {}
@@ -873,6 +987,10 @@ local function execute(command)
       end
     end
     return { fog_start = Lighting.FogStart, fog_end = Lighting.FogEnd }
+  end
+
+  if action == "introspect-scene" then
+    return buildSceneSnapshot(payload)
   end
 
   if action == "run-command" then

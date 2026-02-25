@@ -35,6 +35,7 @@ npm run secure:local
 5. Restart Studio.
 6. Open `Plugins > NovaBlox > Panel`.
 7. In terminal, run `npm run studio:sync` (avoids long key copy/paste in Studio).
+   Re-run this after any `.env` host/API key update.
 8. Restart Studio, then use `Plugins > NovaBlox > Panel` and follow the First-Run Wizard (`Next Step`).
 
 ## Smoke test
