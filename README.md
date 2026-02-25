@@ -39,9 +39,9 @@ Version: `1.1.0`
    cd /path/to/NovaBlox
    npm install
    ```
-2. Generate secure local defaults (host lock + API key):
+2. Run one-click BYOK setup (auto-detects cloud key or local model endpoint, then syncs Studio plugin settings):
    ```bash
-   npm run secure:local
+   npm run setup:oneclick
    ```
 3. Start bridge:
    ```bash
@@ -49,7 +49,7 @@ Version: `1.1.0`
    ```
 4. In Roblox Studio, save `plugin/RobloxStudioBridge.lua` as a Local Plugin.
 5. Enable Studio HTTP requests when prompted.
-6. Sync plugin settings from terminal (no manual API key paste in Studio):
+6. (Optional if you skipped one-click setup) sync plugin settings from terminal:
    ```bash
    npm run studio:sync
    ```
@@ -95,6 +95,23 @@ npm run studio:sync
 ```
 
 This writes `novablox_bridgeHost` and `novablox_apiKey` directly into Roblox plugin settings.
+
+### One-click BYOK setup
+
+```bash
+npm run setup:oneclick
+```
+
+This command:
+
+- ensures secure local bridge host/API key values
+- auto-selects assistant mode from your environment:
+  - `OPENROUTER_API_KEY` -> `openrouter`
+  - `ANTHROPIC_API_KEY` -> `anthropic`
+  - `OPENAI_API_KEY` -> `openai`
+  - no cloud key + local endpoint found -> OpenAI-compatible local mode (Ollama or LM Studio)
+  - none found -> deterministic fallback
+- syncs host/API key into Roblox plugin settings
 
 ### One-command doctor (diagnose + auto-fix)
 
@@ -155,6 +172,7 @@ See `.env.example`.
 - `ROBLOXBRIDGE_ASSISTANT_PROVIDER` (`deterministic|openai|openrouter|anthropic`)
 - `ROBLOXBRIDGE_ASSISTANT_TIMEOUT_MS`
 - `ROBLOXBRIDGE_ASSISTANT_TEMPERATURE`
+- `ROBLOXBRIDGE_ASSISTANT_OPENAI_BASE_URL` (OpenAI-compatible local/custom endpoint)
 - `ROBLOXBRIDGE_ASSISTANT_OPENAI_MODEL`
 - `ROBLOXBRIDGE_ASSISTANT_OPENROUTER_MODEL`
 - `ROBLOXBRIDGE_ASSISTANT_ANTHROPIC_MODEL`

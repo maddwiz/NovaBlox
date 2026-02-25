@@ -11,6 +11,7 @@ Roblox Studio is not officially supported on Linux in this workflow, but you can
 
 ```bash
 cd /home/nova/NovaBlox
+npm run setup:oneclick
 chmod +x scripts/start-server-linux.sh
 ./scripts/start-server-linux.sh
 ```

@@ -5,9 +5,11 @@
 ```bash
 cd /path/to/NovaBlox
 npm install
-npm run secure:local
+npm run setup:oneclick
 npm start
 ```
+
+One-click setup auto-configures secure local bridge values, detects BYOK provider or local model mode, and syncs Studio plugin settings.
 
 macOS arm64 one-command bootstrap:
 

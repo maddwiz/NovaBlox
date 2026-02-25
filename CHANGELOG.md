@@ -34,6 +34,7 @@ All notable changes to NovaBlox are documented in this file.
   - `npm run format`
   - `npm run format:check`
   - `npm run showcase:ultimate`
+  - `npm run setup:oneclick`
 
 ### Changed
 
@@ -41,6 +42,9 @@ All notable changes to NovaBlox are documented in this file.
 - Setup docs now emphasize `npm run studio:sync` as the required host/API-key sync path.
 - MCP server + Python SDK now expose planner and scene introspection endpoints.
 - CI now runs lint/tests/format checks plus Python syntax verification.
+- Added one-click BYOK setup (`scripts/setup_oneclick.js`) with automatic provider selection:
+  - OpenAI / OpenRouter / Anthropic key detection
+  - OpenAI-compatible local model auto-detect (Ollama / LM Studio)
 
 ## [1.1.0] - 2026-02-25
 

@@ -20,7 +20,13 @@ For Apple Silicon (`arm64`) full setup + verification:
 npm run bootstrap:macos-arm64
 ```
 
-Enable local security defaults:
+One-click BYOK setup (recommended):
+
+```bash
+npm run setup:oneclick
+```
+
+Manual local security defaults:
 
 ```bash
 npm run secure:local

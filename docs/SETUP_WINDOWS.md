@@ -10,6 +10,7 @@
 
 ```powershell
 cd C:\path\to\NovaBlox
+npm run setup:oneclick
 scripts\start-server-windows.bat
 ```
 

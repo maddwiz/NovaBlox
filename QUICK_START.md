@@ -3,7 +3,7 @@
 ```bash
 cd /path/to/NovaBlox
 npm install
-npm run secure:local
+npm run setup:oneclick
 npm start
 ```
 
