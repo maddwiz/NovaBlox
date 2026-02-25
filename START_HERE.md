@@ -16,6 +16,7 @@ This setup script:
 - starts the bridge server
 - syncs Roblox plugin settings
 - runs health checks
+- copies your NovaBlox API key to clipboard for easy paste
 
 ## 2. Install the Roblox plugin (one time)
 

@@ -42,6 +42,7 @@ npm run setup:oneclick
 
 HOST="$(read_env_value ROBLOXBRIDGE_HOST || true)"
 PORT="$(read_env_value ROBLOXBRIDGE_PORT || true)"
+API_KEY="$(read_env_value ROBLOXBRIDGE_API_KEY || true)"
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-30010}"
 
@@ -65,9 +66,16 @@ if ! npm run doctor; then
   echo "[NovaBlox] Doctor found issues. Continue with Studio restart and panel wizard."
 fi
 
-print_step "Opening NovaBlox pages"
+print_step "Preparing API key"
+if [[ -n "${API_KEY}" ]] && command -v pbcopy >/dev/null 2>&1; then
+  printf "%s" "${API_KEY}" | pbcopy
+  echo "[NovaBlox] API key copied to clipboard for Studio/Web UI paste."
+else
+  echo "[NovaBlox] API key not copied automatically (missing key or pbcopy unavailable)."
+fi
+
+print_step "Opening NovaBlox Studio UI"
 open "http://${HOST}:${PORT}/bridge/studio" || true
-open "http://${HOST}:${PORT}/docs" || true
 
 if [[ -d "${HOME}/Documents/Roblox/Plugins" ]]; then
   open "${HOME}/Documents/Roblox/Plugins" || true
@@ -80,9 +88,11 @@ cat <<MSG
 2) Open Plugins > NovaBlox > Panel
 3) Click Health, then Enable
 4) Use Build Demo / AI prompts
+5) API key is in clipboard if you need to paste it
 
 To stop bridge later: double-click scripts/stop-bridge-macos.command
 or use repo root launcher: NovaBlox-Stop-Bridge.command
+API docs (optional): http://${HOST}:${PORT}/docs
 MSG
 
 pause_if_tty

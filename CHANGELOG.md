@@ -51,6 +51,7 @@ All notable changes to NovaBlox are documented in this file.
 - Added one-click BYOK setup (`scripts/setup_oneclick.js`) with automatic provider selection:
   - OpenAI / OpenRouter / Anthropic key detection
   - OpenAI-compatible local model auto-detect (Ollama / LM Studio)
+- macOS one-click launcher now copies API key to clipboard and opens Studio UI first (`/bridge/studio`).
 
 ## [1.1.0] - 2026-02-25
 
