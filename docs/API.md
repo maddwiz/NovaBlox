@@ -128,13 +128,16 @@ If dangerous commands are present, set `allow_dangerous=true`.
 ### `POST /bridge/introspection/scene`
 
 Queue a Studio-side scene snapshot action.
+Roblox Studio requirement: `Home > Game Settings > Security > Enable Studio Access to API Services` must be ON.
 
 ```bash
 curl -s -X POST http://127.0.0.1:30010/bridge/introspection/scene \
   -H "X-API-Key: $API_KEY" \
   -H 'Content-Type: application/json' \
-  -d '{"max_objects":500}' | jq .
+  -d '{"max_objects":500,"traversal_scope":"services","services":["Lighting","ReplicatedStorage"]}' | jq .
 ```
+
+`traversal_scope` supports `workspace` (default), `services`, or `datamodel`.
 
 ### `GET /bridge/introspection/scene`
 

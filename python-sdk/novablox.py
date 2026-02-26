@@ -85,10 +85,13 @@ class NovaBlox:
         prompt: str,
         template: Optional[str] = None,
         use_llm: bool = False,
+        allow_dangerous: bool = False,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        timeout_ms: Optional[int] = None,
         include_scene_context: bool = True,
+        scene_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "prompt": prompt,
@@ -103,6 +106,12 @@ class NovaBlox:
             payload["model"] = model
         if temperature is not None:
             payload["temperature"] = float(temperature)
+        if timeout_ms is not None:
+            payload["timeout_ms"] = int(timeout_ms)
+        if allow_dangerous:
+            payload["allow_dangerous"] = True
+        if scene_context and isinstance(scene_context, dict):
+            payload["scene_context"] = scene_context
         return self._post("/assistant/plan", payload)
 
     def assistant_plan(
@@ -111,19 +120,25 @@ class NovaBlox:
         prompt: str,
         template: Optional[str] = None,
         use_llm: bool = False,
+        allow_dangerous: bool = False,
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        timeout_ms: Optional[int] = None,
         include_scene_context: bool = True,
+        scene_context: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         return self.plan(
             prompt=prompt,
             template=template,
             use_llm=use_llm,
+            allow_dangerous=allow_dangerous,
             provider=provider,
             model=model,
             temperature=temperature,
+            timeout_ms=timeout_ms,
             include_scene_context=include_scene_context,
+            scene_context=scene_context,
         )
 
     def execute_plan(
@@ -137,7 +152,9 @@ class NovaBlox:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: Optional[float] = None,
+        timeout_ms: Optional[int] = None,
         include_scene_context: bool = True,
+        scene_context: Optional[Dict[str, Any]] = None,
         expires_in_ms: Optional[int] = None,
         idempotency_prefix: Optional[str] = None,
     ) -> Dict[str, Any]:
@@ -158,6 +175,10 @@ class NovaBlox:
             payload["model"] = model
         if temperature is not None:
             payload["temperature"] = float(temperature)
+        if timeout_ms is not None:
+            payload["timeout_ms"] = int(timeout_ms)
+        if scene_context and isinstance(scene_context, dict):
+            payload["scene_context"] = scene_context
         if expires_in_ms is not None:
             payload["expires_in_ms"] = int(expires_in_ms)
         if idempotency_prefix:
@@ -170,15 +191,23 @@ class NovaBlox:
         max_objects: int = 500,
         include_selection: bool = True,
         include_non_workspace: bool = False,
+        traversal_scope: Optional[str] = None,
+        services: Optional[list[str]] = None,
     ) -> Dict[str, Any]:
-        return self._post(
-            "/introspection/scene",
-            {
-                "max_objects": int(max_objects),
-                "include_selection": bool(include_selection),
-                "include_non_workspace": bool(include_non_workspace),
-            },
-        )
+        payload: Dict[str, Any] = {
+            "max_objects": int(max_objects),
+            "include_selection": bool(include_selection),
+            "include_non_workspace": bool(include_non_workspace),
+        }
+        if traversal_scope:
+            payload["traversal_scope"] = str(traversal_scope).strip().lower()
+        if services:
+            payload["services"] = [
+                str(item).strip()
+                for item in services
+                if str(item).strip()
+            ]
+        return self._post("/introspection/scene", payload)
 
     def scene_introspection(self, *, include_objects: bool = False) -> Dict[str, Any]:
         return self._get(

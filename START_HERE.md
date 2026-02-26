@@ -29,6 +29,14 @@ This setup script:
 
 ## 3. Enable NovaBlox in Studio
 
+Before using the panel, enable Studio HTTP:
+
+1. In Studio, go to `Home > Game Settings > Security`.
+2. Turn on `Enable Studio Access to API Services`.
+3. Save, then restart Studio.
+
+If this is OFF, NovaBlox health/pull will fail.
+
 1. Open `Plugins > NovaBlox > Panel`.
 2. Click `Health` (should return `ok`).
 3. Click `Enable`.
@@ -51,6 +59,7 @@ Double-click:
   - rerun `NovaBlox-OneClick-Setup.command`
   - restart Roblox Studio
   - in panel settings, ensure host is `http://127.0.0.1:30010`
+  - confirm `Home > Game Settings > Security > Enable Studio Access to API Services` is ON
 - `EADDRINUSE ... 30010` in terminal:
   - run `NovaBlox-Stop-Bridge.command`
   - then rerun setup

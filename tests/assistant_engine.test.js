@@ -19,6 +19,13 @@ const ENV_KEYS = [
   "ANTHROPIC_API_KEY",
   "ROBLOXBRIDGE_ASSISTANT_PROVIDER",
   "ROBLOXBRIDGE_ASSISTANT_OPENAI_MODEL",
+  "ROBLOXBRIDGE_ASSISTANT_OPENAI_BASE_URL",
+  "ROBLOXBRIDGE_ASSISTANT_OPENROUTER_MODEL",
+  "ROBLOXBRIDGE_ASSISTANT_OPENROUTER_BASE_URL",
+  "ROBLOXBRIDGE_ASSISTANT_ANTHROPIC_MODEL",
+  "ROBLOXBRIDGE_ASSISTANT_ANTHROPIC_BASE_URL",
+  "OPENROUTER_HTTP_REFERER",
+  "OPENROUTER_APP_TITLE",
 ];
 
 function snapshotEnv() {
@@ -191,6 +198,174 @@ test(
       assert.equal(
         result.plan.commands[0].route,
         "/bridge/scene/create-folder",
+      );
+    } finally {
+      restoreEnv(env);
+      __internal.resetFetchImplementation();
+    }
+  },
+);
+
+test(
+  "buildPlanWithAssistant accepts valid OpenRouter JSON output and headers",
+  { concurrency: false },
+  async () => {
+    const env = snapshotEnv();
+    process.env.OPENROUTER_API_KEY = "or-test";
+    process.env.OPENROUTER_HTTP_REFERER = "https://example.com/novablox";
+    process.env.OPENROUTER_APP_TITLE = "NovaBlox Tests";
+
+    let capturedUrl = "";
+    let capturedInit = null;
+
+    __internal.setFetchImplementation(async (url, init) => {
+      capturedUrl = String(url || "");
+      capturedInit = init || null;
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify({
+                    title: "OpenRouter Plan",
+                    summary: "Test",
+                    commands: [
+                      {
+                        route: "/bridge/scene/spawn-object",
+                        reason: "spawn test part",
+                        payload: { name: "OpenRouterPart", class_name: "Part" },
+                      },
+                    ],
+                  }),
+                },
+              },
+            ],
+          }),
+      };
+    });
+
+    try {
+      const result = await buildPlanWithAssistant({
+        prompt: "spawn one test part",
+        provider: "openrouter",
+        use_llm: true,
+      });
+
+      assert.equal(result.assistant.source, "openrouter");
+      assert.equal(result.assistant.used_llm, true);
+      assert.equal(result.plan.workflow.provider, "openrouter");
+      assert.equal(result.plan.commands.length, 1);
+      assert.equal(result.plan.commands[0].route, "/bridge/scene/spawn-object");
+      assert.match(capturedUrl, /openrouter\.ai\/api\/v1\/chat\/completions$/);
+      assert.equal(capturedInit.headers.Authorization, "Bearer or-test");
+      assert.equal(
+        capturedInit.headers["HTTP-Referer"],
+        "https://example.com/novablox",
+      );
+      assert.equal(capturedInit.headers["X-Title"], "NovaBlox Tests");
+    } finally {
+      restoreEnv(env);
+      __internal.resetFetchImplementation();
+    }
+  },
+);
+
+test(
+  "buildPlanWithAssistant accepts valid Anthropic JSON output",
+  { concurrency: false },
+  async () => {
+    const env = snapshotEnv();
+    process.env.ANTHROPIC_API_KEY = "anthropic-test";
+
+    let capturedUrl = "";
+    let capturedInit = null;
+
+    __internal.setFetchImplementation(async (url, init) => {
+      capturedUrl = String(url || "");
+      capturedInit = init || null;
+      return {
+        ok: true,
+        text: async () =>
+          JSON.stringify({
+            content: [
+              {
+                type: "text",
+                text: JSON.stringify({
+                  title: "Anthropic Plan",
+                  summary: "Test",
+                  commands: [
+                    {
+                      route: "/bridge/scene/create-folder",
+                      reason: "create folder",
+                      payload: {
+                        name: "AnthropicFolder",
+                        parent_path: "Workspace",
+                      },
+                    },
+                  ],
+                }),
+              },
+            ],
+          }),
+      };
+    });
+
+    try {
+      const result = await buildPlanWithAssistant({
+        prompt: "create a folder in workspace",
+        provider: "anthropic",
+        use_llm: true,
+      });
+
+      assert.equal(result.assistant.source, "anthropic");
+      assert.equal(result.assistant.used_llm, true);
+      assert.equal(result.plan.workflow.provider, "anthropic");
+      assert.equal(result.plan.commands.length, 1);
+      assert.equal(
+        result.plan.commands[0].route,
+        "/bridge/scene/create-folder",
+      );
+      assert.match(capturedUrl, /api\.anthropic\.com\/v1\/messages$/);
+      assert.equal(capturedInit.headers["x-api-key"], "anthropic-test");
+      assert.equal(capturedInit.headers["anthropic-version"], "2023-06-01");
+    } finally {
+      restoreEnv(env);
+      __internal.resetFetchImplementation();
+    }
+  },
+);
+
+test(
+  "buildPlanWithAssistant falls back when Anthropic response has no JSON plan",
+  { concurrency: false },
+  async () => {
+    const env = snapshotEnv();
+    process.env.ANTHROPIC_API_KEY = "anthropic-test";
+
+    __internal.setFetchImplementation(async () => ({
+      ok: true,
+      text: async () =>
+        JSON.stringify({
+          content: [{ type: "text", text: "No JSON plan available." }],
+        }),
+    }));
+
+    try {
+      const result = await buildPlanWithAssistant({
+        prompt: "build a pirate ship scene",
+        provider: "anthropic",
+        use_llm: true,
+      });
+
+      assert.equal(result.assistant.source, "deterministic");
+      assert.equal(result.assistant.fallback, true);
+      assert.equal(result.assistant.provider_requested, "anthropic");
+      assert.ok(
+        result.plan.warnings.some((warning) =>
+          String(warning).includes("LLM fallback (anthropic)"),
+        ),
       );
     } finally {
       restoreEnv(env);

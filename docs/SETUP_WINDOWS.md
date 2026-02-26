@@ -16,6 +16,9 @@ scripts\start-server-windows.bat
 
 ## Plugin
 
+Critical: enable `Home > Game Settings > Security > Enable Studio Access to API Services` in Roblox Studio.
+If disabled, NovaBlox plugin health/pull fails.
+
 1. Open Roblox Studio.
 2. Open a place.
 3. Load `plugin\RobloxStudioBridge.lua`.

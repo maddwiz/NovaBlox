@@ -456,6 +456,11 @@ test("scene introspection endpoint queues and caches latest snapshot", async () 
     const command = pulled.body.commands[0];
     assert.equal(command.action, "introspect-scene");
     assert.ok(command.dispatch_token);
+    assert.equal(command.payload.max_objects, 64);
+    assert.equal(command.payload.include_selection, true);
+    assert.equal(command.payload.include_non_workspace, false);
+    assert.equal(command.payload.traversal_scope, "workspace");
+    assert.deepEqual(command.payload.services, []);
 
     const result = await requestJson(port, "POST", "/bridge/results", {
       apiKey: WRITE_KEY,
@@ -470,6 +475,13 @@ test("scene introspection endpoint queues and caches latest snapshot", async () 
           max_objects: 64,
           truncated: false,
           collected_at: new Date().toISOString(),
+          roots: ["Workspace"],
+          traversal_scope: "workspace",
+          include_selection: true,
+          include_non_workspace: false,
+          requested_services: [],
+          resolved_services: ["Workspace"],
+          unresolved_services: [],
           class_counts: { Part: 2 },
           materials: ["Concrete"],
           selection: [],
@@ -494,9 +506,70 @@ test("scene introspection endpoint queues and caches latest snapshot", async () 
     assert.equal(introspection.statusCode, 200);
     assert.equal(introspection.body.introspection.state, "succeeded");
     assert.equal(introspection.body.introspection.scene.object_count, 2);
+    assert.equal(
+      introspection.body.introspection.scene.traversal_scope,
+      "workspace",
+    );
+    assert.ok(Array.isArray(introspection.body.introspection.scene.roots));
     assert.ok(
       Array.isArray(introspection.body.introspection.scene.sample_objects),
     );
+  } finally {
+    await server.stop();
+    assert.equal(server.child.exitCode, 0, server.getStderr());
+  }
+});
+
+test("scene introspection queue normalizes traversal scope and services", async () => {
+  const port = makePort(7);
+  const server = startServer(port);
+  try {
+    await waitForServer(port);
+
+    const queued = await requestJson(
+      port,
+      "POST",
+      "/bridge/introspection/scene",
+      {
+        apiKey: WRITE_KEY,
+        body: {
+          max_objects: 99999,
+          include_selection: false,
+          include_non_workspace: true,
+          traversal_scope: "datamodel",
+          services: [
+            " Lighting ",
+            "ReplicatedStorage",
+            "lighting",
+            "",
+            null,
+            "ServerStorage",
+          ],
+        },
+      },
+    );
+    assert.equal(queued.statusCode, 200);
+    assert.equal(queued.body.status, "queued");
+
+    const pulled = await requestJson(
+      port,
+      "GET",
+      "/bridge/commands?client_id=introspection-options&limit=1",
+      { apiKey: WRITE_KEY },
+    );
+    assert.equal(pulled.statusCode, 200);
+    assert.equal(pulled.body.count, 1);
+    const command = pulled.body.commands[0];
+    assert.equal(command.action, "introspect-scene");
+    assert.equal(command.payload.max_objects, 2000);
+    assert.equal(command.payload.include_selection, false);
+    assert.equal(command.payload.include_non_workspace, true);
+    assert.equal(command.payload.traversal_scope, "datamodel");
+    assert.deepEqual(command.payload.services, [
+      "Lighting",
+      "ReplicatedStorage",
+      "ServerStorage",
+    ]);
   } finally {
     await server.stop();
     assert.equal(server.child.exitCode, 0, server.getStderr());

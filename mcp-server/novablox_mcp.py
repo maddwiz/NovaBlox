@@ -41,6 +41,18 @@ def _wrap(func):
         return {"status": "error", "error": f"Unexpected error: {exc}"}
 
 
+def _parse_json_object(raw: Optional[str], label: str) -> Optional[Dict[str, Any]]:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise NovaBloxError(f"{label} must be valid JSON: {exc}") from exc
+    if not isinstance(parsed, dict):
+        raise NovaBloxError(f"{label} must decode to a JSON object")
+    return parsed
+
+
 @mcp.tool()
 def roblox_health() -> Dict[str, Any]:
     """Check NovaBlox server health."""
@@ -179,25 +191,48 @@ def roblox_planner_catalog() -> Dict[str, Any]:
 
 
 @mcp.tool()
+def roblox_assistant_templates() -> Dict[str, Any]:
+    """Alias: list assistant templates."""
+    return _wrap(client.planner_templates)
+
+
+@mcp.tool()
+def roblox_assistant_catalog() -> Dict[str, Any]:
+    """Alias: list assistant route catalog."""
+    return _wrap(client.planner_catalog)
+
+
+@mcp.tool()
 def roblox_assistant_plan(
     prompt: str,
     template: Optional[str] = None,
     use_llm: bool = False,
+    allow_dangerous: bool = False,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    timeout_ms: Optional[int] = None,
     include_scene_context: bool = True,
+    scene_context_json: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Generate a command plan from natural language."""
-    return _wrap(
-        lambda: client.plan(
+
+    def _run() -> Dict[str, Any]:
+        scene_context = _parse_json_object(scene_context_json, "scene_context_json")
+        return client.plan(
             prompt=prompt,
             template=template,
             use_llm=use_llm,
+            allow_dangerous=allow_dangerous,
             provider=provider,
             model=model,
+            temperature=temperature,
+            timeout_ms=timeout_ms,
             include_scene_context=include_scene_context,
+            scene_context=scene_context,
         )
-    )
+
+    return _wrap(_run)
 
 
 @mcp.tool()
@@ -209,17 +244,16 @@ def roblox_assistant_execute(
     use_llm: bool = False,
     provider: Optional[str] = None,
     model: Optional[str] = None,
+    temperature: Optional[float] = None,
+    timeout_ms: Optional[int] = None,
     include_scene_context: bool = True,
+    scene_context_json: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Queue commands from generated prompt or provided plan JSON."""
 
     def _run() -> Dict[str, Any]:
-        plan: Optional[Dict[str, Any]] = None
-        if plan_json:
-            parsed = json.loads(plan_json)
-            if not isinstance(parsed, dict):
-                raise NovaBloxError("plan_json must decode to a JSON object")
-            plan = parsed
+        plan = _parse_json_object(plan_json, "plan_json")
+        scene_context = _parse_json_object(scene_context_json, "scene_context_json")
         return client.execute_plan(
             plan=plan,
             prompt=prompt,
@@ -228,7 +262,10 @@ def roblox_assistant_execute(
             use_llm=use_llm,
             provider=provider,
             model=model,
+            temperature=temperature,
+            timeout_ms=timeout_ms,
             include_scene_context=include_scene_context,
+            scene_context=scene_context,
         )
 
     return _wrap(_run)
@@ -238,12 +275,24 @@ def roblox_assistant_execute(
 def roblox_scene_introspect(
     max_objects: int = 500,
     include_selection: bool = True,
+    include_non_workspace: bool = False,
+    traversal_scope: str = "workspace",
+    services_csv: str = "",
 ) -> Dict[str, Any]:
-    """Queue scene hierarchy introspection command in Studio."""
+    """Queue scene introspection with optional scope/service controls."""
+
+    services = [
+        item.strip()
+        for item in str(services_csv or "").split(",")
+        if item.strip()
+    ]
     return _wrap(
         lambda: client.introspect_scene(
             max_objects=max_objects,
             include_selection=include_selection,
+            include_non_workspace=include_non_workspace,
+            traversal_scope=traversal_scope,
+            services=services,
         )
     )
 

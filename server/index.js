@@ -103,6 +103,11 @@ const INTROSPECTION_MAX_OBJECTS = clampIntegerEnv(
   1,
   10000,
 );
+const INTROSPECTION_ALLOWED_SCOPES = new Set([
+  "workspace",
+  "services",
+  "datamodel",
+]);
 
 function clampIntegerEnv(raw, fallback, min, max) {
   const parsed = Number.parseInt(String(raw || ""), 10);
@@ -173,6 +178,43 @@ function shallowCopyObject(value) {
   return Object.assign({}, value);
 }
 
+function normalizeTraversalScopeValue(value, fallback = "workspace") {
+  const raw = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (raw === "game") {
+    return "datamodel";
+  }
+  if (INTROSPECTION_ALLOWED_SCOPES.has(raw)) {
+    return raw;
+  }
+  return fallback;
+}
+
+function sanitizeServiceList(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const out = [];
+  const seen = new Set();
+  for (const item of value) {
+    const name = String(item || "").trim();
+    if (!name) {
+      continue;
+    }
+    const key = name.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    out.push(name);
+    if (out.length >= 40) {
+      break;
+    }
+  }
+  return out;
+}
+
 function normalizeSceneSnapshot(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
     return null;
@@ -188,6 +230,25 @@ function normalizeSceneSnapshot(raw) {
   const selection = Array.isArray(raw.selection)
     ? raw.selection.map((item) => String(item))
     : [];
+  const traversalScope = normalizeTraversalScopeValue(
+    raw.traversal_scope || raw.scope,
+    raw.include_non_workspace === true ? "services" : "workspace",
+  );
+  const rootFallback =
+    traversalScope === "datamodel" ? "DataModel" : "Workspace";
+  const root = String(raw.root || rootFallback);
+  const roots = Array.isArray(raw.roots)
+    ? raw.roots
+        .map((item) => String(item || "").trim())
+        .filter(Boolean)
+        .slice(0, 120)
+    : [root];
+  const includeSelection = raw.include_selection !== false;
+  const includeNonWorkspace =
+    raw.include_non_workspace === true || traversalScope !== "workspace";
+  const requestedServices = sanitizeServiceList(raw.requested_services);
+  const resolvedServices = sanitizeServiceList(raw.resolved_services);
+  const unresolvedServices = sanitizeServiceList(raw.unresolved_services);
 
   const objectCountRaw =
     raw.object_count !== undefined && raw.object_count !== null
@@ -198,7 +259,14 @@ function normalizeSceneSnapshot(raw) {
     : objects.length;
 
   return {
-    root: String(raw.root || "Workspace"),
+    root,
+    roots,
+    traversal_scope: traversalScope,
+    include_selection: includeSelection,
+    include_non_workspace: includeNonWorkspace,
+    requested_services: requestedServices,
+    resolved_services: resolvedServices,
+    unresolved_services: unresolvedServices,
     object_count: objectCount,
     max_objects: clampIntegerEnv(
       raw.max_objects,
@@ -218,6 +286,14 @@ function normalizeSceneSnapshot(raw) {
 function sceneContextSummary(sceneSnapshot) {
   if (!sceneSnapshot) {
     return {
+      root: "Workspace",
+      roots: ["Workspace"],
+      traversal_scope: "workspace",
+      include_selection: true,
+      include_non_workspace: false,
+      requested_services: [],
+      resolved_services: [],
+      unresolved_services: [],
       object_count: 0,
       truncated: false,
       class_counts: {},
@@ -228,6 +304,24 @@ function sceneContextSummary(sceneSnapshot) {
   }
   return {
     root: sceneSnapshot.root,
+    roots: Array.isArray(sceneSnapshot.roots)
+      ? sceneSnapshot.roots.slice(0, 24)
+      : [sceneSnapshot.root || "Workspace"],
+    traversal_scope: normalizeTraversalScopeValue(
+      sceneSnapshot.traversal_scope,
+      "workspace",
+    ),
+    include_selection: sceneSnapshot.include_selection !== false,
+    include_non_workspace: sceneSnapshot.include_non_workspace === true,
+    requested_services: Array.isArray(sceneSnapshot.requested_services)
+      ? sceneSnapshot.requested_services.slice(0, 40)
+      : [],
+    resolved_services: Array.isArray(sceneSnapshot.resolved_services)
+      ? sceneSnapshot.resolved_services.slice(0, 40)
+      : [],
+    unresolved_services: Array.isArray(sceneSnapshot.unresolved_services)
+      ? sceneSnapshot.unresolved_services.slice(0, 40)
+      : [],
     object_count: sceneSnapshot.object_count,
     truncated: sceneSnapshot.truncated === true,
     class_counts: shallowCopyObject(sceneSnapshot.class_counts),
@@ -907,7 +1001,7 @@ function buildDocsEndpoints() {
       risk: "safe",
       description: "Queue scene hierarchy introspection from Studio plugin.",
       example_curl:
-        "curl -s -X POST http://127.0.0.1:30010/bridge/introspection/scene -H \"X-API-Key: $API_KEY\" -H 'Content-Type: application/json' -d '{\"max_objects\":500}' | jq .",
+        'curl -s -X POST http://127.0.0.1:30010/bridge/introspection/scene -H "X-API-Key: $API_KEY" -H \'Content-Type: application/json\' -d \'{"max_objects":500,"traversal_scope":"services","services":["Lighting","ReplicatedStorage"]}\' | jq .',
     },
     {
       method: "GET",
@@ -1073,6 +1167,8 @@ app.get("/bridge/capabilities", (_req, res) => {
         cache_route: "/bridge/introspection/scene",
         default_max_objects: INTROSPECTION_DEFAULT_MAX_OBJECTS,
         max_objects: INTROSPECTION_MAX_OBJECTS,
+        scopes: ["workspace", "services", "datamodel"],
+        default_scope: "workspace",
       },
     },
   });
@@ -1101,8 +1197,15 @@ app.post("/bridge/introspection/scene", ...writeAccess, (req, res) => {
     INTROSPECTION_MAX_OBJECTS,
   );
   const includeSelection = !(req.body && req.body.include_selection === false);
-  const includeNonWorkspace =
+  const includeNonWorkspaceRequested =
     req.body && req.body.include_non_workspace === true;
+  const traversalScope = normalizeTraversalScopeValue(
+    req.body && (req.body.traversal_scope || req.body.scope),
+    includeNonWorkspaceRequested ? "services" : "workspace",
+  );
+  const includeNonWorkspace =
+    includeNonWorkspaceRequested || traversalScope !== "workspace";
+  const services = sanitizeServiceList(req.body && req.body.services);
   return queueCommand(
     req,
     res,
@@ -1115,6 +1218,8 @@ app.post("/bridge/introspection/scene", ...writeAccess, (req, res) => {
       max_objects: maxObjects,
       include_selection: includeSelection,
       include_non_workspace: includeNonWorkspace,
+      traversal_scope: traversalScope,
+      services,
     },
     {
       onQueued: (command) => updateSceneStateOnQueued(command),

@@ -17,6 +17,7 @@ const el = {
   template: document.getElementById("template"),
   templateCards: document.getElementById("templateCards"),
   voiceBtn: document.getElementById("voiceBtn"),
+  voiceNotice: document.getElementById("voiceNotice"),
   planBtn: document.getElementById("planBtn"),
   queueBtn: document.getElementById("queueBtn"),
   allowDangerous: document.getElementById("allowDangerous"),
@@ -44,6 +45,23 @@ function log(message, isError = false) {
   line.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
   line.style.color = isError ? "#8a1f1f" : "#20323f";
   el.log.prepend(line);
+}
+
+function setVoiceNotice(message, level = "info") {
+  if (!el.voiceNotice) {
+    return;
+  }
+  const text = String(message || "").trim();
+  el.voiceNotice.textContent = text;
+  el.voiceNotice.className = "voice-notice subtle";
+  if (!text) {
+    return;
+  }
+  if (level === "warn") {
+    el.voiceNotice.classList.add("warn");
+  } else if (level === "error") {
+    el.voiceNotice.classList.add("error");
+  }
 }
 
 function headers() {
@@ -199,6 +217,11 @@ function stopVoiceSession(reason = "") {
     finalizeVoiceSession();
   }, VOICE_FORCE_FINALIZE_MS);
   setVoiceButtonIdle();
+  if (reason === "timeout") {
+    setVoiceNotice("Voice timed out and was stopped automatically.", "warn");
+  } else if (reason === "manual") {
+    setVoiceNotice("Voice input stopped.");
+  }
 }
 
 async function fetchJson(path, options = {}) {
@@ -358,11 +381,21 @@ function setupVoice() {
   if (!Speech) {
     el.voiceBtn.disabled = true;
     el.voiceBtn.title = "SpeechRecognition API unavailable in this browser";
+    setVoiceNotice(
+      "Voice input is unavailable in this browser. Use text prompts instead (Chrome/Edge recommended).",
+      "warn",
+    );
     return;
   }
   if (IS_SAFARI) {
     el.voiceBtn.title =
       "Safari voice is experimental. If mic stays on, stop and refresh.";
+    setVoiceNotice(
+      "Safari voice is experimental. If the mic indicator sticks, close this tab and reset mic permission in Safari settings.",
+      "warn",
+    );
+  } else {
+    setVoiceNotice("");
   }
 
   function createRecognition() {
@@ -385,6 +418,7 @@ function setupVoice() {
       state.suppressAbortError = false;
       el.voiceBtn.className = "btn-danger";
       el.voiceBtn.textContent = "Listening...";
+      setVoiceNotice("Listening. Click Voice Input again to stop.");
       clearVoiceTimer();
       state.voiceTimer = setTimeout(() => {
         if (!state.listening) {
@@ -406,6 +440,7 @@ function setupVoice() {
         el.prompt.value = text;
         log(`voice captured: ${text}`);
       }
+      setVoiceNotice("Voice captured. Review the prompt, then generate plan.");
       stopVoiceSession("captured");
     };
 
@@ -416,12 +451,39 @@ function setupVoice() {
         (state.suppressAbortError || state.voiceStopRequested);
       if (!isExpectedAbort) {
         log(`voice error: ${errorCode}`, true);
+        if (
+          errorCode === "not-allowed" ||
+          errorCode === "service-not-allowed"
+        ) {
+          setVoiceNotice(
+            "Microphone permission is blocked. Allow mic access for this site, then refresh.",
+            "error",
+          );
+        } else if (errorCode === "audio-capture") {
+          setVoiceNotice(
+            "No microphone was detected. Connect a mic and retry voice input.",
+            "error",
+          );
+        } else if (errorCode === "network") {
+          setVoiceNotice(
+            "Voice recognition network error. Retry in a few seconds.",
+            "warn",
+          );
+        } else {
+          setVoiceNotice(`Voice error: ${errorCode}`, "warn");
+        }
       }
       finalizeVoiceSession();
     };
 
     recognition.onend = () => {
       finalizeVoiceSession();
+      if (IS_SAFARI) {
+        setVoiceNotice(
+          "Voice stopped. If Safari still shows mic in use, close this tab or disable mic permission for 127.0.0.1.",
+          "warn",
+        );
+      }
     };
 
     return recognition;

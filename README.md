@@ -36,6 +36,11 @@ New user? Start here first: `START_HERE.md`
 
 ## Quick start
 
+> [!IMPORTANT]
+> Roblox Studio must have `HttpService` enabled or the plugin cannot pull commands/results.
+> In Studio open `Home > Game Settings > Security` and enable:
+> `Enable Studio Access to API Services`.
+
 1. Install server dependencies:
    ```bash
    cd /path/to/NovaBlox
@@ -51,7 +56,8 @@ New user? Start here first: `START_HERE.md`
    npm start
    ```
 5. In Roblox Studio, save `plugin/RobloxStudioBridge.lua` as a Local Plugin.
-6. Enable Studio HTTP requests when prompted.
+6. In Roblox Studio, enable `HttpService`:
+   `Home > Game Settings > Security > Enable Studio Access to API Services`.
 7. (Optional if you skipped one-click setup) sync plugin settings from terminal:
    ```bash
    npm run studio:sync

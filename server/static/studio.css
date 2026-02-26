@@ -373,6 +373,19 @@ button:active {
   margin-top: 8px;
 }
 
+.voice-notice {
+  min-height: 1.3em;
+  margin: 4px 0 8px;
+}
+
+.voice-notice.warn {
+  color: #ffd79a;
+}
+
+.voice-notice.error {
+  color: #ffb2cc;
+}
+
 .commands {
   display: grid;
   gap: 8px;

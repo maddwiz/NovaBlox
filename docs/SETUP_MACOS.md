@@ -48,6 +48,9 @@ npm run secure:local
 
 ## Plugin
 
+Critical: in Roblox Studio enable `Home > Game Settings > Security > Enable Studio Access to API Services` before using NovaBlox.
+If this is disabled, plugin health checks and command pull will fail.
+
 1. Open Roblox Studio.
 2. Open a place.
 3. Open `plugin/RobloxStudioBridge.lua`.

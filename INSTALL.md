@@ -38,6 +38,9 @@ Shortcuts:
 
 ## 2. Roblox Studio plugin
 
+Critical: enable `HttpService` or NovaBlox will fail health/pull.
+In Studio: `Home > Game Settings > Security > Enable Studio Access to API Services`.
+
 1. Open Roblox Studio.
 2. Create any place.
 3. Open `plugin/RobloxStudioBridge.lua`.

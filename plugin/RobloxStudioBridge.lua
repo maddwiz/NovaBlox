@@ -518,66 +518,273 @@ local function colorToArray(color)
   }
 end
 
+local DEFAULT_INTROSPECTION_SERVICES = {
+  "Lighting",
+  "ReplicatedStorage",
+  "ServerStorage",
+  "StarterGui",
+  "StarterPack",
+  "StarterPlayer",
+  "SoundService",
+  "Teams",
+  "CollectionService",
+  "MaterialService",
+  "Players",
+  "TextChatService",
+}
+
+local function safeIsA(obj, className)
+  local ok, value = pcall(function()
+    return obj:IsA(className)
+  end)
+  return ok and value == true
+end
+
+local function safeGetChildren(obj)
+  local ok, children = pcall(function()
+    return obj:GetChildren()
+  end)
+  if ok and type(children) == "table" then
+    return children
+  end
+  return {}
+end
+
+local function safeGetFullName(obj)
+  if not obj then
+    return ""
+  end
+  local ok, fullName = pcall(function()
+    return obj:GetFullName()
+  end)
+  if ok and type(fullName) == "string" and fullName ~= "" then
+    return fullName
+  end
+  local name = safeMember(obj, "Name")
+  if type(name) == "string" and name ~= "" then
+    return name
+  end
+  return tostring(obj)
+end
+
+local function cleanString(raw)
+  return tostring(raw or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function parseRequestedServices(payload)
+  local rawServices = nil
+  if type(payload.services) == "table" then
+    rawServices = payload.services
+  elseif type(payload.service_names) == "table" then
+    rawServices = payload.service_names
+  end
+  if not rawServices then
+    return {}
+  end
+
+  local names = {}
+  local seen = {}
+  for _, rawName in ipairs(rawServices) do
+    local name = cleanString(rawName)
+    if name ~= "" then
+      local key = string.lower(name)
+      if not seen[key] then
+        seen[key] = true
+        table.insert(names, name)
+      end
+    end
+  end
+  return names
+end
+
+local function normalizeTraversalScope(payload)
+  local requested = string.lower(cleanString(payload.traversal_scope or payload.scope))
+  if requested == "datamodel" or requested == "game" then
+    return "datamodel"
+  end
+  if requested == "services" or requested == "service" or requested == "non_workspace" then
+    return "services"
+  end
+  if requested == "workspace" then
+    return "workspace"
+  end
+  if payload.include_non_workspace == true then
+    return "services"
+  end
+  return "workspace"
+end
+
+local function safeGetService(serviceName)
+  local ok, service = pcall(function()
+    return game:GetService(serviceName)
+  end)
+  if ok and service then
+    return service
+  end
+  return nil
+end
+
+local function buildTraversalRoots(payload)
+  local scope = normalizeTraversalScope(payload)
+  local requestedServices = parseRequestedServices(payload)
+  local roots = {}
+  local rootPaths = {}
+  local seenRoots = {}
+  local unresolved = {}
+  local resolvedServices = {}
+
+  local function addRoot(instance, serviceName)
+    if not instance or seenRoots[instance] then
+      return
+    end
+    seenRoots[instance] = true
+    table.insert(roots, instance)
+    table.insert(rootPaths, safeGetFullName(instance))
+    if serviceName then
+      table.insert(resolvedServices, serviceName)
+    end
+  end
+
+  if scope == "datamodel" then
+    addRoot(game, "DataModel")
+    return {
+      scope = scope,
+      roots = roots,
+      root_paths = rootPaths,
+      requested_services = requestedServices,
+      resolved_services = resolvedServices,
+      unresolved_services = unresolved,
+    }
+  end
+
+  addRoot(workspace, "Workspace")
+  if scope == "services" then
+    local serviceList = requestedServices
+    if #serviceList == 0 then
+      serviceList = DEFAULT_INTROSPECTION_SERVICES
+    end
+
+    for _, serviceName in ipairs(serviceList) do
+      local service = safeGetService(serviceName)
+      if service then
+        addRoot(service, serviceName)
+      else
+        table.insert(unresolved, serviceName)
+      end
+    end
+  end
+
+  return {
+    scope = scope,
+    roots = roots,
+    root_paths = rootPaths,
+    requested_services = requestedServices,
+    resolved_services = resolvedServices,
+    unresolved_services = unresolved,
+  }
+end
+
 local function buildSceneSnapshot(payload)
   local maxObjects = math.floor(tonumber(payload.max_objects) or 500)
   maxObjects = math.clamp(maxObjects, 1, 5000)
+  local includeSelection = payload.include_selection ~= false
+  local traversal = buildTraversalRoots(payload)
 
   local queue = {}
   local queueIndex = 1
-  table.insert(queue, workspace)
+  for _, root in ipairs(traversal.roots) do
+    table.insert(queue, { node = root, is_root = true })
+  end
 
   local objects = {}
   local classCounts = {}
   local materialIndex = {}
   local selectionPaths = {}
   local truncated = false
+  local visited = {}
 
   while queueIndex <= #queue do
-    local node = queue[queueIndex]
+    local queued = queue[queueIndex]
     queueIndex += 1
+    local node = queued and queued.node or nil
 
-    if node ~= workspace then
-      if #objects >= maxObjects then
-        truncated = true
-        break
+    if node and not visited[node] then
+      visited[node] = true
+
+      local skipNode = node == game
+      if traversal.scope == "workspace" and queued and queued.is_root and node == workspace then
+        skipNode = true
       end
 
-      local parentPath = node.Parent and node.Parent:GetFullName() or "Workspace"
-      local entry = {
-        name = node.Name,
-        class_name = node.ClassName,
-        path = node:GetFullName(),
-        parent_path = parentPath,
-      }
+      if not skipNode then
+        if #objects >= maxObjects then
+          truncated = true
+          break
+        end
 
-      classCounts[node.ClassName] = (classCounts[node.ClassName] or 0) + 1
+        local className = tostring(safeMember(node, "ClassName") or "Instance")
+        classCounts[className] = (classCounts[className] or 0) + 1
 
-      if node:IsA("BasePart") then
-        entry.position = vectorToArray(node.Position)
-        entry.size = vectorToArray(node.Size)
-        entry.material = materialToString(node.Material)
-        entry.color = colorToArray(node.Color)
-        entry.anchored = node.Anchored
-        entry.can_collide = node.CanCollide
-        materialIndex[entry.material] = true
-      elseif node:IsA("Model") then
-        local okPivot, pivot = pcall(function()
-          return node:GetPivot()
-        end)
-        if okPivot and pivot then
-          entry.pivot = {
-            round3(pivot.X),
-            round3(pivot.Y),
-            round3(pivot.Z),
-          }
+        local parent = safeMember(node, "Parent")
+        local parentPath = parent and safeGetFullName(parent) or "ROOT"
+        local entry = {
+          name = tostring(safeMember(node, "Name") or className),
+          class_name = className,
+          path = safeGetFullName(node),
+          parent_path = parentPath,
+        }
+
+        if safeIsA(node, "BasePart") then
+          local position = safeMember(node, "Position")
+          local size = safeMember(node, "Size")
+          local material = safeMember(node, "Material")
+          local color = safeMember(node, "Color")
+          if position then
+            entry.position = vectorToArray(position)
+          end
+          if size then
+            entry.size = vectorToArray(size)
+          end
+          if material then
+            entry.material = materialToString(material)
+            materialIndex[entry.material] = true
+          end
+          if color then
+            entry.color = colorToArray(color)
+          end
+          entry.anchored = safeMember(node, "Anchored")
+          entry.can_collide = safeMember(node, "CanCollide")
+        elseif safeIsA(node, "Model") then
+          local okPivot, pivot = pcall(function()
+            return node:GetPivot()
+          end)
+          if okPivot and pivot then
+            entry.pivot = {
+              round3(pivot.X),
+              round3(pivot.Y),
+              round3(pivot.Z),
+            }
+          end
+        elseif safeIsA(node, "Attachment") then
+          local position = safeMember(node, "Position")
+          if position then
+            entry.position = vectorToArray(position)
+          end
+        elseif safeIsA(node, "Terrain") then
+          entry.material = "Terrain"
+          materialIndex.Terrain = true
+        end
+
+        table.insert(objects, entry)
+      end
+
+      if not truncated then
+        for _, child in ipairs(safeGetChildren(node)) do
+          if not visited[child] then
+            table.insert(queue, { node = child, is_root = false })
+          end
         end
       end
-
-      table.insert(objects, entry)
-    end
-
-    for _, child in ipairs(node:GetChildren()) do
-      table.insert(queue, child)
     end
   end
 
@@ -589,13 +796,22 @@ local function buildSceneSnapshot(payload)
   end
   table.sort(materials)
 
-  local selected = Selection:Get()
-  for _, instance in ipairs(selected) do
-    table.insert(selectionPaths, instance:GetFullName())
+  if includeSelection then
+    local selected = Selection:Get()
+    for _, instance in ipairs(selected) do
+      table.insert(selectionPaths, safeGetFullName(instance))
+    end
   end
 
   return {
-    root = workspace:GetFullName(),
+    root = traversal.scope == "datamodel" and "DataModel" or workspace:GetFullName(),
+    roots = traversal.root_paths,
+    traversal_scope = traversal.scope,
+    include_non_workspace = traversal.scope ~= "workspace",
+    include_selection = includeSelection,
+    requested_services = traversal.requested_services,
+    resolved_services = traversal.resolved_services,
+    unresolved_services = traversal.unresolved_services,
     object_count = #objects,
     max_objects = maxObjects,
     truncated = truncated,

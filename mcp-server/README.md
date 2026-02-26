@@ -3,7 +3,7 @@
 ## Install
 
 ```bash
-cd /home/nova/NovaBlox/mcp-server
+cd /path/to/NovaBlox/mcp-server
 pip install -r requirements.txt
 ```
 
@@ -28,7 +28,13 @@ ROBLOXBRIDGE_HOST=localhost ROBLOXBRIDGE_PORT=30010 python novablox_mcp.py
 - `roblox_import_blender`
 - `roblox_planner_templates`
 - `roblox_planner_catalog`
+- `roblox_assistant_templates`
+- `roblox_assistant_catalog`
 - `roblox_assistant_plan`
 - `roblox_assistant_execute`
 - `roblox_scene_introspect`
 - `roblox_scene_introspection`
+
+`roblox_assistant_plan` and `roblox_assistant_execute` expose planner/assistant controls including `provider`, `model`, `temperature`, `timeout_ms`, and optional JSON scene context overrides.
+
+`roblox_scene_introspect` supports hierarchy scope control via `traversal_scope` (`workspace|services|datamodel`) and optional `services_csv`.
